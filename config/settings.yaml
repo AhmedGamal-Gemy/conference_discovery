@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────
+# Conference Discovery — settings.yaml
+# ─────────────────────────────────────────
+
+discovery:
+  topic: "medical"
+  months_ahead: 3
+  sources:
+    exa: true
+    directories: false      # disabled for demo
+    org_websites: false     # disabled for demo
+
+exa:
+  num_results: 10
+  pages_per_query: 2
+
+validation:
+  min_speakers: 5
+  min_non_local: 5
+  min_travel_hours: 4
+  date_window:
+    min_days: 30            # reject if < 1 month away
+    max_days: 90            # queue if > 3 months away
+
+output:
+  excel_path: "./output/conferences.xlsx"
+  notify_email: ""          # empty = skip email for demo
+
+llm:
+  orchestrator:
+    model: "mistral/mistral-small-latest"
+    temperature: 0.2
+  extraction:
+    model: "mistral/mistral-small-latest"
+    temperature: 0.1
+  validation:
+    model: "mistral/mistral-small-latest"
+    temperature: 0.1
+  relevance_filter:
+    model: "mistral/mistral-small-latest"
+    temperature: 0.0
+
+debug : true
