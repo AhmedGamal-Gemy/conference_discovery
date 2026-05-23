@@ -55,6 +55,7 @@ class LLMModelConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     orchestrator: LLMModelConfig = LLMModelConfig(temperature=0.2)
+    discovery: LLMModelConfig = LLMModelConfig(temperature=0.2)
     extraction: LLMModelConfig = LLMModelConfig(temperature=0.1)
     validation: LLMModelConfig = LLMModelConfig(temperature=0.1)
     relevance_filter: LLMModelConfig = LLMModelConfig(temperature=0.0)
@@ -97,5 +98,4 @@ settings = SystemSettings() # type: ignore
 if __name__ == "__main__":
     # You don't need to pass the dict manually anymore!
     # BaseSettings automatically finds and loads the YAML file on instantiation.
-    #kkkkkk
     print(settings.discovery.topic)

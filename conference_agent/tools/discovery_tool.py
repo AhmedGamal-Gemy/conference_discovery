@@ -1,40 +1,11 @@
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 import asyncio
 
-from google.adk.agents.llm_agent import Agent
-from google.adk.models import LiteLlm
-
 from conference_agent.config import settings
+from conference_agent.tools.query_generator import generate_queries
 from conference_agent.tools.exa_tool import search_conferences
 from conference_agent.tools.relevance_filter import (
     is_relevant_conference
 )
-
-MODEL = LiteLlm(
-    settings.llm.relevance_filter.model
-)
-
-def generate_queries():
-    topic = settings.discovery.topic
-    months = settings.discovery.months_ahead
-
-    now = datetime.now()
-
-    queries = []
-
-    for i in range(months):
-        date = now + relativedelta(months=i)
-
-        month = date.strftime("%B")
-        year = date.year
-
-        query = f"{topic} conferences {month} {year} speakers"
-
-        queries.append(query)
-
-    return queries
-
 
 async def run_discovery():
 
@@ -94,15 +65,6 @@ async def run_discovery():
 
         except Exception as e:
             print(f"ERROR: {e}")
+            
 
     return clean_results
-
-
-discovery_agent = Agent(
-    model=MODEL,
-    name="discovery_agent",
-    description="Discovers and filters conference URLs",
-    instruction="""
-You discover scientific conference URLs.
-""",
-)

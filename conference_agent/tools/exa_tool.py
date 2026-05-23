@@ -11,16 +11,14 @@ def search_conferences(query: str, num_results: int = 10):
     result = exa.search_and_contents(
         query,
         num_results=num_results,
-        text=True
+        text={"max_characters": 500}
     )
 
-    conferences = []
-
-    for r in result.results:
-        conferences.append({
+    return [
+        {
             "url": r.url,
-            "title": r.title,
+            "title": r.title or "",
             "snippet": r.text[:500] if r.text else ""
-        })
-
-    return conferences
+        }
+        for r in result.results
+    ]
