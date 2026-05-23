@@ -11,7 +11,7 @@ discovery:
     org_websites: false     # disabled for demo
 
 exa:
-  num_results: 10
+  num_results: 5
   pages_per_query: 2
 
 validation:
@@ -28,6 +28,9 @@ output:
 
 llm:
   orchestrator:
+    model: "mistral/mistral-small-latest"
+    temperature: 0.2
+  discovery:
     model: "mistral/mistral-small-latest"
     temperature: 0.2
   extraction:
