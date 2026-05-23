@@ -527,8 +527,10 @@ source = { virtual = "." }
 dependencies = [
     { name = "exa-py" },
     { name = "google-adk", extra = ["extensions"] },
+    { name = "litellm" },
     { name = "pydantic-settings", extra = ["yaml"] },
     { name = "python-dateutil" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "scrapling" },
 ]
@@ -537,8 +539,10 @@ dependencies = [
 requires-dist = [
     { name = "exa-py", specifier = ">=2.13.0" },
     { name = "google-adk", extras = ["extensions"], specifier = ">=1.33.0" },
+    { name = "litellm", specifier = ">=1.83.14" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.14.1" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "scrapling", extras = ["ai"], specifier = ">=0.2.99" },
 ]

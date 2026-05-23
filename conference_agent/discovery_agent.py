@@ -1,118 +1,108 @@
-#Search + Exa + filtering + return conferences
-import os
-from exa_py import Exa
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import asyncio
+
+from google.adk.agents.llm_agent import Agent
+from google.adk.models import LiteLlm
+
 from conference_agent.config import settings
+from conference_agent.tools.exa_tool import search_conferences
+from conference_agent.tools.relevance_filter import (
+    is_relevant_conference
+)
 
-exa = Exa(api_key=os.getenv("EXA_API_KEY"))
+MODEL = LiteLlm(
+    settings.llm.relevance_filter.model
+)
 
-# 1. Generate queries
-def generate_queries(topic: str, months_ahead: int):
-    queries = []
+def generate_queries():
+    topic = settings.discovery.topic
+    months = settings.discovery.months_ahead
+
     now = datetime.now()
 
-    for i in range(months_ahead):
-        date = now + relativedelta(months=i)
-        month = date.strftime("%B")
-        year = date.strftime("%Y")
+    queries = []
 
-        queries.append(f"{topic} conferences {month} {year} speakers")
+    for i in range(months):
+        date = now + relativedelta(months=i)
+
+        month = date.strftime("%B")
+        year = date.year
+
+        query = f"{topic} conferences {month} {year} speakers"
+
+        queries.append(query)
 
     return queries
 
-# 2. Exa search
-def search_exa(exa, query: str):
-    results = exa.search_and_contents(
-        query,
-        num_results=settings.exa.num_results,
-        text=True
-    )
 
-    return [
-        {
-            "url": r.url,
-            "title": r.title or "",
-            "snippet": r.text[:500] if r.text else ""
-        }
-        for r in results.results
-    ]
+async def run_discovery():
 
-# 3. Deduplicate
-def deduplicate(results):
-    seen = set()
-    clean = []
+    print("\nGenerating queries...\n")
 
-    for r in results:
-        if r["url"] not in seen:
-            seen.add(r["url"])
-            clean.append(r)
+    queries = generate_queries()
 
-    return clean
+    for q in queries:
+        print(q)
 
-# 4. Prompt builder
-def build_prompt(topic, item):
-    return f"""
-You are filtering conference search results.
+    raw_results = []
 
-Topic: {topic}
+    print("\nSearching Exa...\n")
 
-Title: {item['title']}
-URL: {item['url']}
-Snippet: {item['snippet']}
+    for query in queries:
+        results = search_conferences(
+            query,
+            settings.exa.num_results
+        )
 
-Question:
-Is this a REAL conference relevant to the topic?
+        raw_results.extend(results)
 
-Rules:
-- YES only if it's an actual conference/event page
-- NO for blogs, lists, directories, SEO pages
+    print(f"Found {len(raw_results)} raw results")
 
-Answer only YES or NO
-"""
-# 5. Filter with LLM
-async def filter_results(llm, topic, results):
-    filtered = []
+    dedup = {}
 
-    for r in results:
-        prompt = build_prompt(topic, r)
-        response = await llm.generate(prompt)
+    for r in raw_results:
+        dedup[r["url"]] = r
 
-        if "YES" in response.upper():
-            filtered.append({
-                "url": r["url"],
-                "title": r["title"]
-            })
+    deduped_results = list(dedup.values())
 
-    return filtered
+    print(f"Deduplicated → {len(deduped_results)}")
 
-# 6. MAIN AGENT
-class DiscoveryAgent:
-    def __init__(self, exa, llm):
-        self.exa = exa
-        self.llm = llm
+    print("\nRunning relevance filter...\n")
 
-    async def run(self):
-        topic = settings.discovery.topic
-        months = settings.discovery.months_ahead
+    clean_results = []
 
-        # step 1: queries
-        queries = generate_queries(topic, months)
+    for r in deduped_results:
 
-        # step 2: search
-        all_results = []
-        for q in queries:
-            all_results.extend(search_exa(self.exa, q))
+        try:
+            relevant = await is_relevant_conference(
+                topic=settings.discovery.topic,
+                title=r["title"],
+                snippet=r["snippet"],
+                url=r["url"]
+            )
 
-        # step 3: dedup
-        unique = deduplicate(all_results)
+            if relevant:
+                print(f"ACCEPTED: {r['title']}")
+                clean_results.append({
+                    "url": r["url"],
+                    "title": r["title"]
+                })
 
-        # step 4: filter
-        final = await filter_results(self.llm, topic, unique)
+            else:
+                print(f"REJECTED: {r['title']}")
 
-        return final
+        except Exception as e:
+            print(f"ERROR: {e}")
+
+    return clean_results
 
 
-# Note: llm is not defined in this module. Do not execute on import.
-# Example usage (run from an async context after creating an llm instance):
-#   await DiscoveryAgent(exa, llm).run()
+discovery_agent = Agent(
+    model=MODEL,
+    name="discovery_agent",
+    description="Discovers and filters conference URLs",
+    instruction="""
+You discover scientific conference URLs.
+""",
+)
