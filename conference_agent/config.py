@@ -66,6 +66,7 @@ class SystemSettings(BaseSettings):
     validation: ValidationConfig
     output: OutputConfig
     llm: LLMConfig
+    scrapling_mcp_url:str
     debug: bool
 
     # Point to your YAML file here
@@ -97,5 +98,5 @@ settings = SystemSettings() # type: ignore
 if __name__ == "__main__":
     # You don't need to pass the dict manually anymore!
     # BaseSettings automatically finds and loads the YAML file on instantiation.
-    #kkkkkk
     print(settings.discovery.topic)
+

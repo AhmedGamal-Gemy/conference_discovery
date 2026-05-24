@@ -1,11 +1,12 @@
 
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-from mcp.types import ContentBlock, CallToolResult
+from mcp.types import CallToolResult
 import asyncio
+from conference_agent.config import settings
 
 scrapling_toolset = McpToolset(
     connection_params=StreamableHTTPConnectionParams(
-        url="http://localhost:8016/mcp",
+        url=settings.scrapling_mcp_url,
     ),
 )
 
