@@ -41,6 +41,7 @@ async def test():
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(markdown)
 
-    print(f"✅ Saved to {output_path} ({len(markdown)} chars)")
+    print(f"[OK] Saved to {output_path} ({len(markdown)} chars)")
 
-asyncio.run(test())
+if __name__ == "__main__":
+    asyncio.run(test())

@@ -1,3 +1,9 @@
+import litellm
+
+# Disable all retries — free tier APIs hit rate limits quickly,
+# and retrying just makes it worse. Better to fail fast.
+litellm.num_retries = 0
+
 from typing import Tuple, Type
 from pydantic import BaseModel
 from pydantic_settings import (
