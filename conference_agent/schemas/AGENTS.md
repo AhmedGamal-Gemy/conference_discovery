@@ -14,7 +14,7 @@ Strictly typed Pydantic models representing conference data. Each model maps to 
 | `RegistrationData` | `registration.py` | `REGISTRATION_EXTRACTION_PROMPT` | `covers_accommodation` |
 | `ValidationResult` | `validation.py` | (validation layer) | `passed`, `failed_condition`, `rejection_reason`, `date_bucket` |
 | `Conference` | `conference.py` | (composed) | Aggregates all sub-models + derived counters |
-| `output_keys` | `output_keys.py` | (pipeline contract) | `StrEnum` — `URL`, `HOMEPAGE_MARKDOWN`, etc. |
+| `output_keys` | `output_keys.py` | (pipeline contract) | `StrEnum` — `URL`, `HOMEPAGE_MARKDOWN`, `HOMEPAGE_DATA` |
 
 ## CONVENTIONS
 - All fields are `Optional[...]` except booleans and IDs — LLM extraction may miss fields.
@@ -26,3 +26,4 @@ Strictly typed Pydantic models representing conference data. Each model maps to 
 - **DO NOT add extraction logic to models** — keep models pure; prompts live in `../prompts/`.
 - **DO NOT make booleans optional** — use explicit defaults (`False`) so LLM always has a value to override.
 - **NEVER add fields without updating the corresponding prompt** — schema and prompt must stay in sync.
+- **output_schema stores as dict in state** — `output_key` on sub-agents saves as plain dict, not Pydantic model instance. Validate with `Model.model_validate(state[key])` when reading back.

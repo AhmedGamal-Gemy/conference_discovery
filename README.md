@@ -62,7 +62,13 @@ export MISTRAL_API_KEY=your-mistral-api-key-here
 
 ```bash
 # Test step 1: scrape homepage
-uv run python tests/test_step1_scrape_homepage.py
+uv run python conference_agent/tests/test_step1_scrape_homepage.py
+
+# Test step 2: extract structured data from markdown
+uv run python conference_agent/tests/test_step2_extract_homepage.py
+
+# Test full pipeline (orchestrator: step1 -> delay -> step2)
+uv run python conference_agent/tests/test_orchestrator.py
 ```
 
 ## Project Structure
@@ -70,26 +76,40 @@ uv run python tests/test_step1_scrape_homepage.py
 ```
 conference_discovery/
 ├── conference_agent/         # Core agent package
+│   ├── steps/                # ADK step agents (orchestration pipeline)
+│   │   ├── step1_scrape_homepage.py
+│   │   ├── step2_extract_homepage.py
+│   │   └── step_rate_limit_delay.py
+│   ├── tests/                # Test suite
+│   │   ├── test_step1_scrape_homepage.py
+│   │   ├── test_step2_extract_homepage.py
+│   │   └── test_orchestrator.py
 │   ├── agent.py              # Root ADK orchestrator agent
 │   ├── config.py             # SystemSettings (YAML + env + init priority)
+│   ├── orchestrator.py       # SequentialAgent chaining step1 -> delay -> step2
 │   ├── prompts/              # LLM extraction prompts
 │   │   └── extraction.py     # Homepage, speakers, venue, registration prompts
 │   ├── schemas/              # Pydantic data models
 │   │   ├── conference.py     # Top-level composed model
 │   │   ├── homepage.py       # Homepage extraction target
+│   │   ├── output_keys.py    # Pipeline state key enum
 │   │   ├── speaker.py        # Speakers page extraction target
 │   │   ├── venue.py          # Venue page extraction target
 │   │   ├── registration.py   # Registration page extraction target
 │   │   └── validation.py     # Pass/fail with rejection reason
-│   ├── steps/                # ADK step agents
-│   │   └── step1_scrape_homepage.py
-│   └── tools/                # MCP toolsets
-│       └── scrapling_tool.py # MCP client for stealthy_fetch
+│   └── tools/                # MCP toolsets + utilities
+│       ├── scrapling_tool.py # MCP client for stealthy_fetch
+│       ├── intermediate_output.py # Persist state to output/intermediate/
+│       ├── discovery_tool.py # Exa search + relevance filter
+│       ├── exa_tool.py       # Exa API wrapper
+│       ├── query_generator.py
+│       └── relevance_filter.py
 ├── config/
 │   └── settings.yaml         # YAML settings (topic, thresholds, LLM temps, MCP URL)
-├── tests/                    # Test suite
-├── output/                   # Scraping results + generated reports
-├── notes/                    # Research notes
+├── database/                 # (empty — TBD persistence layer)
+├── notes/                    # Research notes (schema-viability.md)
+├── output/                   # Scraping results + intermediate pipeline snapshots
+│   └── intermediate/         # Session state saved as .md / .json
 ├── main.py                   # Entry point (stub)
 └── pyproject.toml            # Python dependencies
 ```
@@ -110,6 +130,13 @@ python -m conference_agent
 
 # Test scraping tool directly
 uv run python conference_agent/tools/scrapling_tool.py
+
+# Test individual steps
+uv run python conference_agent/tests/test_step1_scrape_homepage.py
+uv run python conference_agent/tests/test_step2_extract_homepage.py
+
+# Test full pipeline
+uv run python conference_agent/tests/test_orchestrator.py
 
 # Install dependencies
 uv pip install -e ".[extensions]"

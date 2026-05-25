@@ -17,6 +17,9 @@ Google ADK-based agent package that discovers and validates conferences via LLM-
 | Add step agent | `steps/*.py` | ADK `LlmAgent` with `output_key` for pipeline state |
 | Add test | `tests/*.py` | Runner-based tests for step agents |
 | Add state key | `schemas/output_keys.py` | `StrEnum` used by `output_key` across steps |
+| Change orchestrator | `orchestrator.py` | `SequentialAgent` chains step1 → delay → step2 |
+| Add delay between steps | `steps/step_rate_limit_delay.py` | Custom `BaseAgent` that sleeps |
+| Save intermediate output | `tools/intermediate_output.py` | Writes state to `output/intermediate/` |
 
 ## CONVENTIONS
 - Every schema lives in its own file under `schemas/`.

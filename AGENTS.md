@@ -1,8 +1,8 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-05-24
-**Commit:** a59ac26
-**Branch:** feature/test
+**Generated:** 2026-05-25
+**Commit:** 64afb61
+**Branch:** feat/step1_scrape_homepage
 
 ## OVERVIEW
 Conference discovery agent that scrapes conference websites, extracts structured data via LLM prompts, and validates conferences against configurable criteria (speaker count, travel time, dates). Built with Google ADK + Pydantic.
@@ -54,7 +54,11 @@ conference_discovery/
 | `ValidationResult` | model | `conference_agent/schemas/validation.py:5` | Pass/fail with rejection reason |
 | `scrapling_toolset` | McpToolset | `conference_agent/tools/scrapling_tool.py:7` | MCP client for `stealthy_fetch` |
 | `scrape_homepage_agent` | LlmAgent | `conference_agent/steps/step1_scrape_homepage.py:11` | Step 1: fetch homepage via MCP |
+| `extract_homepage_agent` | LlmAgent | `conference_agent/steps/step2_extract_homepage.py:11` | Step 2: extract HomepageData from markdown |
+| `rate_limit_delay_agent` | BaseAgent | `conference_agent/steps/step_rate_limit_delay.py:24` | Sleep step between LLM-heavy agents |
+| `sequential_orchestrator` | SequentialAgent | `conference_agent/orchestrator.py:19` | Chains step1 → delay → step2 |
 | `output_keys` | StrEnum | `conference_agent/schemas/output_keys.py:4` | Session state keys for pipeline |
+| `save_intermediate` | func | `conference_agent/tools/intermediate_output.py:35` | Persist state values to output/intermediate/ |
 | `test` | async func | `conference_agent/tools/scrapling_tool.py:15` | Manual scraping test runner |
 
 ## CONVENTIONS
@@ -87,6 +91,12 @@ python conference_agent/tools/scrapling_tool.py
 # Test step 1 agent
 uv run python conference_agent/tests/test_step1_scrape_homepage.py
 
+# Test step 2 agent
+uv run python conference_agent/tests/test_step2_extract_homepage.py
+
+# Test full pipeline (orchestrator)
+uv run python conference_agent/tests/test_orchestrator.py
+
 # Start MCP server (Docker)
 docker run -d -p 8016:8016 --name scrapling-mcp pyd4vinci/scrapling:latest mcp --http --port 8016
 
@@ -99,6 +109,8 @@ uv pip install -e ".[extensions]"
 - `requirements.txt` is empty — all deps declared in `pyproject.toml`.
 - Scrapling MCP server must be running locally at `http://localhost:8016/mcp`.
   Use `--http --port 8016` flags; default `stdio` transport won't work with ADK.
-- `output/` contains manual test artifacts, not committed production output.
+- `output/` contains manual test artifacts + `output/intermediate/` for pipeline state snapshots.
 - Tests live in `conference_agent/tests/` (root `tests/` removed).
 - `database/` is reserved for future persistence layer.
+- **output_key behavior**: On root agents, result returns as final response text. On sub-agents within a `SequentialAgent`, `output_key` stores in parent session state (as dict, not Pydantic model).
+- **Rate limiting**: Mistral free tier is strict. Orchestrator includes a 60s delay step between LLM-heavy agents. LiteLLM retries are disabled on 429.
