@@ -18,14 +18,18 @@ def _ensure_dir():
 
 
 def _serialize(value: Any) -> Any:
-    """Pydantic-friendly JSON serializer."""
+    """Recursively serialize values for JSON."""
     if isinstance(value, date):
         return value.isoformat()
     if hasattr(value, "model_dump"):
-        return value.model_dump()
+        return _serialize(value.model_dump())
+    if isinstance(value, dict):
+        return {k: _serialize(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_serialize(v) for v in value]
     if hasattr(value, "__dict__"):
-        return value.__dict__
-    return str(value)
+        return _serialize(value.__dict__)
+    return value
 
 
 def save_intermediate(key: str, value: Any, suffix: str = "") -> Path:

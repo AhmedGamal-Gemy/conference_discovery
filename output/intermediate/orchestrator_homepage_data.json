@@ -1,0 +1,10 @@
+{
+  "conference_name": "Forty-Third International Conference on Machine Learning",
+  "date_start": "2026-7-6",
+  "date_end": "2026-7-11",
+  "industry": "computer science",
+  "sub_pages": {
+    "venue": "https://icml.cc/Conferences/2026/Hotels",
+    "registration": "https://icml.cc/Register/view-registration"
+  }
+}
