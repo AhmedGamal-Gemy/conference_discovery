@@ -6,6 +6,7 @@ from google.genai.types import Content, Part
 from conference_agent.steps.step2_extract_homepage import extract_homepage_agent
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.schemas.homepage import HomepageData
+from conference_agent.tools.intermediate_output import save_intermediate
 
 async def test_extract_homepage():
     """Test step2_extract_homepage agent using Runner.
@@ -127,6 +128,22 @@ async def test_extract_homepage():
     else:
         print("[WARN] No final response text captured.")
         print("Note: output_key only auto-stores when agent runs as a sub-agent in a parent workflow.")
+
+    # 7. Save intermediate output to disk
+    print("\n=== SAVING INTERMEDIATE OUTPUT ===")
+    saved = []
+    if output_keys.HOMEPAGE_MARKDOWN in session.state:
+        path = save_intermediate("step2_input_markdown", session.state[output_keys.HOMEPAGE_MARKDOWN])
+        saved.append(str(path))
+    if output_keys.HOMEPAGE_DATA in session.state:
+        path = save_intermediate("step2_homepage_data", session.state[output_keys.HOMEPAGE_DATA])
+        saved.append(str(path))
+    if final_text:
+        path = save_intermediate("step2_final_response", final_text)
+        saved.append(str(path))
+    print(f"[OK] Saved {len(saved)} files to output/intermediate/")
+    for s in saved:
+        print(f"  - {s}")
 
 if __name__ == "__main__":
     asyncio.run(test_extract_homepage())

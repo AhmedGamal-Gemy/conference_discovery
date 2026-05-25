@@ -4,6 +4,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from conference_agent.steps.step1_scrape_homepage import scrape_homepage_agent
 from conference_agent.schemas.output_keys import output_keys
+from conference_agent.tools.intermediate_output import save_intermediate
 
 async def test_scrape_homepage():
     """Test step1_scrape_homepage agent using Runner.
@@ -76,6 +77,19 @@ async def test_scrape_homepage():
             print(final_text[:1000])
         else:
             print("No final response text captured.")
+
+    # 7. Save intermediate output to disk
+    print("\n=== SAVING INTERMEDIATE OUTPUT ===")
+    saved = []
+    if output_keys.HOMEPAGE_MARKDOWN in session.state:
+        path = save_intermediate("step1_homepage_markdown", session.state[output_keys.HOMEPAGE_MARKDOWN])
+        saved.append(str(path))
+    if final_text:
+        path = save_intermediate("step1_final_response", final_text)
+        saved.append(str(path))
+    print(f"[OK] Saved {len(saved)} files to output/intermediate/")
+    for s in saved:
+        print(f"  - {s}")
 
 if __name__ == "__main__":
     asyncio.run(test_scrape_homepage())
