@@ -1,3 +1,16 @@
+STEP1_SCRAPE_HOMEPAGE_PROMPT = """
+You are a web scraping agent.
+Fetch the conference homepage at this URL: {state.URL}
+
+Use the stealthy_fetch tool with these exact parameters:
+- url: {state.URL}
+- timeout: 60000
+- solve_cloudflare: true
+- headless: true
+- main_content_only: true
+
+Return the raw markdown content only. No explanation, no commentary.
+"""
 
 
 HOMEPAGE_EXTRACTION_PROMPT = """
@@ -25,7 +38,7 @@ Rules:
 - For dates, only extract dates for THIS specific upcoming conference edition, not past editions.
 
 Homepage markdown:
-{markdown}
+{state.HOMEPAGE_MARKDOWN}
 """
 
 

@@ -8,10 +8,9 @@ exa = Exa(api_key=os.getenv("EXA_API_KEY"))
 
 
 def search_conferences(query: str, num_results: int = 10):
-    result = exa.search_and_contents(
+    result = exa.search(
         query,
         num_results=num_results,
-        text={"max_characters": 500}
     )
 
     return [
