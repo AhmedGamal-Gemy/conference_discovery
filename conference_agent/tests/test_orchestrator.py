@@ -5,6 +5,7 @@ from google.genai.types import Content, Part
 from conference_agent.orchestrator import sequential_orchestrator
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.schemas.homepage import HomepageData
+from conference_agent.tools.intermediate_output import save_intermediate, save_session_state
 
 async def test_sequential_orchestrator():
     """Test the sequential orchestrator that chains step1 → step2.
@@ -126,6 +127,13 @@ async def test_sequential_orchestrator():
         print("  1. scrape_homepage_agent -> fetched markdown")
         print("  2. extract_homepage_agent -> extracted HomepageData")
         print("  3. output_key propagation working between steps")
+
+    # 8. Save all intermediate outputs to disk
+    print("\n=== SAVING INTERMEDIATE OUTPUTS ===")
+    saved = save_session_state(updated_session.state, prefix="orchestrator_")
+    print(f"[OK] Saved {len(saved)} files to output/intermediate/")
+    for s in saved:
+        print(f"  - {s.name}")
 
 if __name__ == "__main__":
     asyncio.run(test_sequential_orchestrator())
