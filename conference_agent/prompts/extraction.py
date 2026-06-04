@@ -1,9 +1,20 @@
+"""
+LLM extraction prompts.
+
+NOTE: Prompts use {state.output_keys.KEY} uppercase placeholders for readability.
+A DRY resolver at the bottom replaces each with the ADK-native {key} syntax
+at module load time — before ADK's template engine resolves against session state.
+"""
+
+from conference_agent.schemas.output_keys import output_keys
+
+
 STEP1_SCRAPE_HOMEPAGE_PROMPT = """
 You are a web scraping agent.
-Fetch the conference homepage at this URL: {state.URL}
-
+Fetch the conference homepage at this URL: {state.output_keys.URL}
+ 
 Use the stealthy_fetch tool with these exact parameters:
-- url: {state.URL}
+- url: {state.output_keys.URL}
 - timeout: 60000
 - solve_cloudflare: true
 - headless: true
@@ -38,7 +49,7 @@ Rules:
 - For dates, only extract dates for THIS specific upcoming conference edition, not past editions.
 
 Homepage markdown:
-{state.HOMEPAGE_MARKDOWN}
+{state.output_keys.HOMEPAGE_MARKDOWN}
 """
 
 
@@ -120,4 +131,25 @@ Rules:
 Registration page markdown:
 {markdown}
 """
+
+
+# ---------------------------------------------------------------------------
+# DRY resolver: replace {state.output_keys.KEY} with output_keys enum values.
+# Runs once at module load time — before ADK's template engine. Prompts use
+# the self-documenting {state.output_keys.KEY} form; this converts them to
+# ADK-native {state.key} syntax (e.g. {state.output_keys.URL} → {state.url}).
+# ---------------------------------------------------------------------------
+def _resolve_state_keys(text: str) -> str:
+    for member in output_keys:
+        text = text.replace(
+            f"{{state.output_keys.{member.name}}}",
+            f"{{state.{member.value}}}",
+        )
+    return text
+
+
+# Apply to all prompts that reference output_keys
+STEP1_SCRAPE_HOMEPAGE_PROMPT = _resolve_state_keys(STEP1_SCRAPE_HOMEPAGE_PROMPT)
+HOMEPAGE_EXTRACTION_PROMPT = _resolve_state_keys(HOMEPAGE_EXTRACTION_PROMPT)
+
 
