@@ -12,17 +12,43 @@ Strictly typed Pydantic models representing conference data. Each model maps to 
 | `SpeakersData` | `speaker.py` | `SPEAKERS_EXTRACTION_PROMPT` | `speakers[]`, `speakers_confirmed` |
 | `VenueData` | `venue.py` | `VENUE_EXTRACTION_PROMPT` | `venue_name`, `venue_address`, `city`, `country`, `is_hotel` |
 | `RegistrationData` | `registration.py` | `REGISTRATION_EXTRACTION_PROMPT` | `covers_accommodation` |
+| `DiscoveredLinksData` | `discovered_links.py` | (discover_links step) | `links: list[DiscoveredLink]` (url, link_text, category) |
 | `ValidationResult` | `validation.py` | (validation layer) | `passed`, `failed_condition`, `rejection_reason`, `date_bucket` |
 | `Conference` | `conference.py` | (composed) | Aggregates all sub-models + derived counters |
-| `output_keys` | `output_keys.py` | (pipeline contract) | `StrEnum` — `URL`, `HOMEPAGE_MARKDOWN`, etc. |
+| `output_keys` | `output_keys.py` | (pipeline contract) | `StrEnum` — explicit string values |
+
+## OUTPUT KEYS
+Defined in `output_keys.py` — all uppercase strings to match `{state.URL}` template pattern:
+- `URL = "URL"` — input target URL
+- `HOMEPAGE_MARKDOWN = "HOMEPAGE_MARKDOWN"` — scraped homepage content
+- `HOMEPAGE_DATA = "HOMEPAGE_DATA"` — extracted conference data
+- `DISCOVERED_LINKS = "DISCOVERED_LINKS"` — classified links from homepage
+- `PROBED_LINKS = "PROBED_LINKS"` — results from URL path probing
+- `SUB_PAGES_URLS = "SUB_PAGES_URLS"` — merged speaker/venue/registration URLs
+- `SCRAPED_SUB_PAGES = "SCRAPED_SUB_PAGES"` — scraped sub-page markdown
+
+> **IMPORTANT**: Must use explicit string values (not `auto()`) because `StrEnum.auto()` produces lowercase (`url`), but prompt templates reference uppercase (`{state.URL}`).
+
+## DISCOVERED LINK CATEGORIES
+The `DiscoveredLink` model uses a `Literal` type for category:
+- `speakers` — keynote, invited talks, speakers list
+- `venue` — location, hotels, travel, accommodation
+- `registration` — tickets, fees, payment, attending
+- `schedule` — program, agenda, timetable, sessions
+- `blog` — blog posts, articles
+- `news` — announcements, press releases, updates
+- `other` — sponsors, FAQ, code of conduct, etc.
 
 ## CONVENTIONS
 - All fields are `Optional[...]` except booleans and IDs — LLM extraction may miss fields.
 - Derived counters (`total_speakers`, `non_local_count`, `non_usa_count`) live on `Conference`, never on sub-models.
 - Geocoding-enriched fields (`travel_hours`, `is_local`, `is_usa`) are optional on `Speaker` — populated post-scrape.
 - `date_bucket` is a `Literal["now", "future", "reject"]` — used for scheduling/prioritization.
+- SubPages (from `homepage.py`) has 3 fields: `speakers`, `venue`, `registration` (all `Optional[str]`).
 
 ## ANTI-PATTERNS
 - **DO NOT add extraction logic to models** — keep models pure; prompts live in `../prompts/`.
 - **DO NOT make booleans optional** — use explicit defaults (`False`) so LLM always has a value to override.
 - **NEVER add fields without updating the corresponding prompt** — schema and prompt must stay in sync.
+- **output_schema stores as dict in state** — `output_key` on sub-agents saves as plain dict, not Pydantic model instance. Validate with `Model.model_validate(state[key])` when reading back.
+- **DO NOT set SubPages fields to empty string** — use `None` to indicate "not found/not applicable".

@@ -7,6 +7,12 @@ from conference_agent.config import settings
 scrapling_toolset = McpToolset(
     connection_params=StreamableHTTPConnectionParams(
         url=settings.scrapling_mcp_url,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        },
+        timeout=30.0,
+        sse_read_timeout=300.0,
     ),
 )
 

@@ -1,7 +1,6 @@
 import litellm
 
-# Disable all retries — free tier APIs hit rate limits quickly,
-# and retrying just makes it worse. Better to fail fast.
+# Client-side retries disabled — the LiteLLM proxy handles rate limiting.
 litellm.num_retries = 0
 
 from typing import Tuple, Type
@@ -100,6 +99,18 @@ class SystemSettings(BaseSettings):
         )
 
 settings = SystemSettings() # type: ignore
+
+# ── LiteLLM proxy config (after settings so .env vars are loaded) ──────
+import os as _os
+# Official ADK+LiteLLM proxy pattern:
+# https://docs.litellm.ai/docs/tutorials/google_adk#5-using-litellm-proxy-with-adk
+_litellm_proxy_key = _os.environ.get(
+    "LITELLM_PROXY_API_KEY",
+    "sk-GE_MBZsUSFrR3FQ86lZ8hg",
+)
+_os.environ["LITELLM_PROXY_API_KEY"] = _litellm_proxy_key
+_os.environ.setdefault("LITELLM_PROXY_API_BASE", "http://localhost:4000")
+litellm.use_litellm_proxy = True  # Routes all LLM calls through the proxy
 
 # Run the code
 if __name__ == "__main__":

@@ -1,116 +1,189 @@
 # Conference Discovery
 
-Conference discovery agent that scrapes conference websites, extracts structured data via LLM prompts, and validates conferences against configurable criteria (speaker count, travel time, dates). Built with Google ADK + Pydantic.
+Conference discovery agent that scrapes conference websites, extracts structured data via LLM prompts, and validates conferences against configurable criteria (speaker count, travel time, dates). Built with Google ADK + Pydantic + LiteLLM.
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Scrapling  │     │  LiteLLM     │     │  Mistral     │
+│  MCP Server │────▶│  Proxy       │────▶│  API         │
+│  :8016      │     │  :4000       │     │              │
+└─────────────┘     └──────────────┘     └──────────────┘
+       ▲                   ▲
+       │  MCP SSE          │  OpenAI-compat
+       │                   │
+┌──────┴───────────────────┴──────────────────────────┐
+│                 ADK Workflow                        │
+│                                                      │
+│  scrape → delay → extract → delay → discover       │
+│  → probe → merge → scrape_sub_pages                 │
+└──────────────────────────────────────────────────────┘
+```
 
 ## Prerequisites
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) for dependency management
-- Docker (for Scrapling MCP server)
-- Mistral API key
+- Docker Desktop
+- Mistral API key (free tier works)
 
-## Quick Start
+## Setup
 
-### 1. Start the Scrapling MCP Server
+### 1. Start Docker Infrastructure
 
-The scrapling MCP server must be running before any agent or test can fetch web pages. Note that scrapling defaults to `stdio` transport; you must pass `--http` to enable the HTTP transport used by ADK:
+Start all services (Scrapling MCP, LiteLLM proxy, PostgreSQL):
 
 ```bash
-docker run -d -p 8016:8016 --name scrapling-mcp pyd4vinci/scrapling:latest mcp --http --port 8016
+# Start Scrapling MCP server
+docker run -d -p 8016:8016 --name scrapling-mcp --restart unless-stopped \
+  pyd4vinci/scrapling:latest mcp --http --port 8016
+
+# Start LiteLLM proxy + database
+docker compose up -d
 ```
 
-Verify it's up (expect a JSON-RPC error about `text/event-stream` — this confirms the server is listening):
+Verify both are running:
+
 ```bash
+# Scrapling MCP (expects SSE — returns expected error on plain HTTP)
 curl http://localhost:8016/mcp
-# Response: {"jsonrpc":"2.0","id":"server-error",..."Not Acceptable: Client must accept text/event-stream"}
+# → {"jsonrpc":"2.0",...,"Not Acceptable: Client must accept text/event-stream"}
+
+# LiteLLM proxy
+curl http://localhost:4000/models \
+  -H "Authorization: Bearer sk-GE_MBZsUSFrR3FQ86lZ8hg"
+# → {"data":[{"id":"mistral-small",...}]}
 ```
 
-To stop:
-```bash
-docker stop scrapling-mcp
+### 2. Configure Environment
+
+Create `conference_agent/.env` (already exists if cloned with secrets):
+
+```env
+MISTRAL_API_KEY=your-mistral-api-key-here
+EXA_API_KEY=your-exa-api-key-here
+
+# LiteLLM Proxy Configuration
+LITELLM_PROXY_API_BASE=http://localhost:4000
+LITELLM_PROXY_API_KEY=sk-GE_MBZsUSFrR3FQ86lZ8hg
+PROXY_MASTER_KEY=sk-1234
 ```
 
-To restart:
-```bash
-docker start scrapling-mcp
-```
-
-### 2. Install Dependencies
+### 3. Install Dependencies
 
 ```bash
 uv pip install -e ".[extensions]"
 ```
 
-### 3. Configure Environment
+## Running the Pipeline
 
-Create a `.env` file in the project root:
-
-```bash
-MISTRAL_API_KEY=your-mistral-api-key-here
-```
-
-Or set it directly:
-```bash
-# Windows PowerShell
-$env:MISTRAL_API_KEY="your-mistral-api-key-here"
-
-# Linux/Mac
-export MISTRAL_API_KEY=your-mistral-api-key-here
-```
-
-### 4. Run Tests
+### Full pipeline test (recommended)
 
 ```bash
-# Test step 1: scrape homepage
-uv run python tests/test_step1_scrape_homepage.py
+uv run python conference_agent/tests/test_orchestrator.py
 ```
+
+This runs all 8 workflow steps against a target URL and validates output:
+
+```
+scrape → [30s delay] → extract → [30s delay] → discover → probe → merge → scrape_sub_pages
+```
+
+### Individual step tests
+
+```bash
+# Step 1: scrape homepage via Scrapling MCP
+uv run python conference_agent/tests/test_step1_scrape_homepage.py
+
+# Step 2: extract structured data from markdown
+uv run python conference_agent/tests/test_step2_extract_homepage.py
+
+# Test scrapling tool directly
+uv run python conference_agent/tools/scrapling_tool.py
+```
+
+### Output
+
+Pipeline outputs are saved to `output/intermediate/`:
+- `orchestrator_HOMEPAGE_MARKDOWN.md` — raw scraped homepage
+- `orchestrator_HOMEPAGE_DATA.json` — extracted conference data
+- `orchestrator_DISCOVERED_LINKS.json` — all links found
+- `orchestrator_PROBED_LINKS.md` — URL path probing results
+- `orchestrator_SUB_PAGES_URLS.json` — merged sub-page URLs
+- `orchestrator_SCRAPED_SUB_PAGES.md` — scraped speakers/venue/registration
+
+## Configuration
+
+Edit `config/settings.yaml`:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `discovery.topic` | `"medical"` | Conference search topic |
+| `validation.min_speakers` | `5` | Min speakers to pass validation |
+| `validation.min_travel_hours` | `4` | Min travel hours from local |
+| `llm.orchestrator.model` | `mistral-small` | LLM model (via proxy) |
+| `llm.extraction.temperature` | `0.1` | Extraction LLM temperature |
+
+## Troubleshooting
+
+### LiteLLM proxy not responding
+```bash
+docker compose restart litellm-proxy
+```
+
+### Scrapling MCP server down
+```bash
+docker restart scrapling-mcp
+```
+
+### LLM calls fail with 429 (rate limited)
+The exponential backoff delay (30s base, 1.5x exponent, max 300s) handles this automatically. The LiteLLM proxy also retries internally (up to 20 retries with backoff).
 
 ## Project Structure
 
 ```
 conference_discovery/
 ├── conference_agent/         # Core agent package
-│   ├── agent.py              # Root ADK orchestrator agent
-│   ├── config.py             # SystemSettings (YAML + env + init priority)
-│   ├── prompts/              # LLM extraction prompts
-│   │   └── extraction.py     # Homepage, speakers, venue, registration prompts
-│   ├── schemas/              # Pydantic data models
-│   │   ├── conference.py     # Top-level composed model
-│   │   ├── homepage.py       # Homepage extraction target
-│   │   ├── speaker.py        # Speakers page extraction target
-│   │   ├── venue.py          # Venue page extraction target
-│   │   ├── registration.py   # Registration page extraction target
-│   │   └── validation.py     # Pass/fail with rejection reason
 │   ├── steps/                # ADK step agents
-│   │   └── step1_scrape_homepage.py
-│   └── tools/                # MCP toolsets
-│       └── scrapling_tool.py # MCP client for stealthy_fetch
+│   │   ├── step1_scrape_homepage.py
+│   │   ├── step2_extract_homepage.py
+│   │   ├── step2_5_discover_links.py
+│   │   ├── step2_6_probe_paths.py
+│   │   ├── step3_merge_links.py
+│   │   ├── step4_scrape_sub_pages.py
+│   │   └── step_rate_limit_delay.py
+│   ├── tests/
+│   │   ├── test_step1_scrape_homepage.py
+│   │   ├── test_step2_extract_homepage.py
+│   │   └── test_orchestrator.py
+│   ├── agent.py              # Root LLM agent
+│   ├── config.py             # SystemSettings (YAML + env)
+│   ├── orchestrator.py       # Workflow pipeline
+│   ├── prompts/
+│   │   └── extraction.py     # LLM extraction prompts
+│   ├── schemas/              # Pydantic models
+│   │   ├── conference.py
+│   │   ├── homepage.py
+│   │   ├── discovered_links.py
+│   │   ├── speaker.py
+│   │   ├── venue.py
+│   │   ├── registration.py
+│   │   ├── validation.py
+│   │   └── output_keys.py
+│   └── tools/
+│       ├── scrapling_tool.py # MCP client for stealthy_fetch
+│       ├── path_probe.py     # URL path probing
+│       ├── discovery_tool.py # Exa search
+│       ├── exa_tool.py       # Exa API wrapper
+│       ├── query_generator.py
+│       ├── relevance_filter.py
+│       └── intermediate_output.py
 ├── config/
-│   └── settings.yaml         # YAML settings (topic, thresholds, LLM temps, MCP URL)
-├── tests/                    # Test suite
-├── output/                   # Scraping results + generated reports
-├── notes/                    # Research notes
-├── main.py                   # Entry point (stub)
-└── pyproject.toml            # Python dependencies
-```
-
-## Configuration
-
-Edit `config/settings.yaml` to adjust:
-- **Discovery topic**: `discovery.topic` (default: `"medical"`)
-- **Validation thresholds**: `validation.min_speakers`, `min_non_local`, `min_travel_hours`, `date_window`
-- **LLM models**: `llm.*.model` and temperatures per role
-- **MCP server URL**: `scrapling_mcp_url` (default: `http://localhost:8016/mcp`)
-
-## Commands
-
-```bash
-# Run agent
-python -m conference_agent
-
-# Test scraping tool directly
-uv run python conference_agent/tools/scrapling_tool.py
-
-# Install dependencies
-uv pip install -e ".[extensions]"
+│   └── settings.yaml         # All config (LLM, validation, etc.)
+├── docker-compose.yml        # LiteLLM proxy + PostgreSQL
+├── proxy_config.yaml         # LiteLLM proxy settings
+├── output/
+│   └── intermediate/         # Pipeline state snapshots
+└── main.py                   # Entry point (stub)
 ```
