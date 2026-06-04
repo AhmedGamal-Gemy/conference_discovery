@@ -1,15 +1,16 @@
-from enum import StrEnum
+from enum import StrEnum, auto
 
 
 class output_keys(StrEnum):
-    URL = "URL"                # input — set by Orchestrator
-    HOMEPAGE_MARKDOWN = "HOMEPAGE_MARKDOWN"
-    HOMEPAGE_DATA = "HOMEPAGE_DATA"
-    DISCOVERED_LINKS = "DISCOVERED_LINKS"
-    PROBED_LINKS = "PROBED_LINKS"
-    SUB_PAGES_URLS = "SUB_PAGES_URLS"
-    SCRAPED_SUB_PAGES = "SCRAPED_SUB_PAGES"
-    SPEAKERS_DATA = "SPEAKERS_DATA"
-    VENUE_DATA = "VENUE_DATA"
-    REGISTRATION_DATA = "REGISTRATION_DATA"
+    URL = auto()
+    HOMEPAGE_MARKDOWN = auto()
+    HOMEPAGE_DATA = auto()
+    DISCOVERED_LINKS = auto()
+    PROBED_LINKS = auto()
+    SUB_PAGES_URLS = auto()
+    SCRAPED_SUB_PAGES = auto()
+    SPEAKERS_DATA = auto()
+    VENUE_DATA = auto()
+    REGISTRATION_DATA = auto()
+    SUB_PAGES_DATA = auto()
 
