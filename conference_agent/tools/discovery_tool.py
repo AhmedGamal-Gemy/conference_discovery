@@ -28,6 +28,7 @@ async def run_discovery():
 
         raw_results.extend(results)
 
+
     print(f"Found {len(raw_results)} raw results")
 
     dedup = {}

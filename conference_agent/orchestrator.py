@@ -1,27 +1,63 @@
 """
-Sequential orchestrator that chains step agents:
-1. scrape_homepage_agent  → fetches markdown, stores in state[HOMEPAGE_MARKDOWN]
-2. extract_homepage_agent → reads state[HOMEPAGE_MARKDOWN], extracts HomepageData
+Workflow orchestrator that chains all step agents:
+1. scrape_homepage_agent  → fetches markdown
+2. delay (exp backoff)    → pauses between LLM-heavy steps
+3. extract_homepage_agent → extracts HomepageData from markdown
+4. delay (exp backoff)    → pauses between LLM-heavy steps
+5. discover_links_agent   → extracts and classifies all links from markdown
+6. probe_paths_agent      → probes common URL paths for sub-pages
+7. merge_links_agent      → picks best sub-page URLs from all discovered links
+8. scrape_sub_pages_agent → scrapes speakers, venue, registration sub-pages
 
-This uses ADK's SequentialAgent which runs sub-agents in order and manages
-state propagation between them.
+Uses Workflow (ADK 2.0 graph-based replacement for SequentialAgent).
+
+Note: All LLM calls route through the local LiteLLM proxy (port 4000)
+configured in config.py. The proxy handles rate limiting with its own
+Mistral API key. Delay steps use exponential backoff.
 """
 
-from google.adk.agents.sequential_agent import SequentialAgent
+from google.adk import Workflow
+
+from conference_agent.config import settings
 
 from conference_agent.steps.step1_scrape_homepage import scrape_homepage_agent
-from conference_agent.steps.step_rate_limit_delay import rate_limit_delay_agent
+from conference_agent.steps.step_rate_limit_delay import RateLimitDelayAgent
 from conference_agent.steps.step2_extract_homepage import extract_homepage_agent
+from conference_agent.steps.step2_5_discover_links import discover_links_agent
+from conference_agent.steps.step2_6_probe_paths import probe_paths_agent
+from conference_agent.steps.step3_merge_links import merge_links_agent
+from conference_agent.steps.step4_scrape_sub_pages import scrape_sub_pages_agent
 
-# Sequential orchestrator: runs sub-agents in order and manages
-# state propagation between them.
-# SequentialAgent is a shell — it doesn't need a model; it delegates to sub-agents.
-sequential_orchestrator = SequentialAgent(
-    name="sequential_orchestrator",
-    description="Fetches conference homepage, waits, then extracts structured data",
-    sub_agents=[
-        scrape_homepage_agent,
-        rate_limit_delay_agent,   # sleep 30s between LLM-heavy steps
-        extract_homepage_agent,
+# Separate delay instances to avoid Workflow cycle detection (same object twice = cycle)
+delay_after_scrape = RateLimitDelayAgent(
+    name="delay_after_scrape",
+    description="Pauses after scraping to avoid rate limits",
+    base_seconds=30.0,
+    exponent=1.5,
+    max_seconds=300.0,
+)
+delay_after_extract = RateLimitDelayAgent(
+    name="delay_after_extract",
+    description="Pauses after extraction to avoid rate limits",
+    base_seconds=30.0,
+    exponent=1.5,
+    max_seconds=300.0,
+)
+
+pipeline_orchestrator = Workflow(
+    name="pipeline_orchestrator",
+    description="Full conference scraping pipeline: fetch → extract → discover → probe → merge → scrape sub-pages",
+    edges=[
+        (
+            "START",
+            scrape_homepage_agent,
+            delay_after_scrape,
+            extract_homepage_agent,
+            delay_after_extract,
+            discover_links_agent,
+            probe_paths_agent,
+            merge_links_agent,
+            scrape_sub_pages_agent,
+        ),
     ],
 )

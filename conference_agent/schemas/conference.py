@@ -30,3 +30,7 @@ class Conference(BaseModel):
     website_url: str
     speakers_page_url: Optional[str] = None
 
+
+
+
+

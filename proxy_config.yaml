@@ -1,0 +1,31 @@
+model_list:
+  - model_name: mistral-small
+    litellm_params:
+      model: mistral/mistral-small-latest
+      api_key: os.environ/MISTRAL_API_KEY
+      rpm: 10
+      tpm: 1000
+      timeout: 120
+      num_retries: 20
+  
+  - model_name: mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+      rpm: 10
+      tpm: 500
+      timeout: 120
+      num_retries: 20
+
+general_settings:
+  master_key: sk-1234
+  database_url: postgresql://litellm:litellm@db:5432/litellm
+  
+router_settings:
+  redis_host: ""
+  routing_strategy: simple-shuffle
+  num_retries: 20
+  timeout: 300
+  retry_after: 5
+  allowed_fails: 100
+  cooldown_time: 60

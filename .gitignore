@@ -14,3 +14,12 @@ wheels/
 
 # Environment variables
 .env
+
+# Generated pipeline output
+output/intermediate/
+
+# Agent metadata directories
+.omo/
+.opencode/
+.playwright-mcp/
+.sisyphus/

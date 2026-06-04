@@ -2,20 +2,21 @@ import asyncio
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
-from conference_agent.orchestrator import sequential_orchestrator
+from conference_agent.orchestrator import pipeline_orchestrator
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.schemas.homepage import HomepageData
-from conference_agent.tools.intermediate_output import save_intermediate, save_session_state
+from conference_agent.tools.intermediate_output import save_session_state
 
-async def test_sequential_orchestrator():
-    """Test the sequential orchestrator that chains step1 → step2.
-    
+
+async def test_full_pipeline():
+    """Test the full Workflow pipeline: scrape → extract → discover → probe → merge → scrape sub-pages.
+
     Prerequisites:
     - MCP server running at http://localhost:8016/mcp
     - MISTRAL_API_KEY set in environment
     - Valid config/settings.yaml
     """
-    
+
     # 1. Create session service + session
     session_service = InMemorySessionService()
     session = await session_service.create_session(
@@ -25,21 +26,21 @@ async def test_sequential_orchestrator():
     )
 
     # 2. Inject URL into state
-    test_url = "https://after.org.in/event/index.php?id=100947439"
+    test_url = "https://2026.emnlp.org/"
     session.state[output_keys.URL] = test_url
     print(f"Session initialized with URL: {test_url}")
 
-    # 3. Create runner with sequential orchestrator as root
+    # 3. Create runner with pipeline orchestrator as root
     runner = Runner(
-        agent=sequential_orchestrator,
+        agent=pipeline_orchestrator,
         app_name="conference_discovery",
         session_service=session_service
     )
 
     # 4. Run it
-    print(f"\nRunning sequential orchestrator...")
-    print("Expected flow: step1_scrape -> step2_extract\n")
-    
+    print(f"\nRunning pipeline orchestrator (Workflow)...")
+    print("Expected flow: scrape → delay → extract → delay → discover → probe → merge → scrape_sub_pages\n")
+
     async for event in runner.run_async(
         user_id="test_user",
         session_id="test_session",
@@ -49,14 +50,15 @@ async def test_sequential_orchestrator():
         if event.content and event.content.parts:
             part = event.content.parts[0]
             if part.text:
-                print(f">>> {event.author}: {part.text[:300]}")
+                preview = part.text[:200].replace("\n", " ")
+                print(f">>> {event.author}: {preview}")
             elif part.function_call:
                 print(f">>> {event.author}: [TOOL CALL] {part.function_call.name}")
-        
+
         if event.is_final_response():
             print(f"\n=== FINAL RESPONSE from {event.author} ===")
 
-    # 5. Get UPDATED session from service (ADK pattern: state lives in session_service)
+    # 5. Get updated session
     updated_session = await session_service.get_session(
         app_name="conference_discovery",
         user_id="test_user",
@@ -69,18 +71,29 @@ async def test_sequential_orchestrator():
         if key == output_keys.HOMEPAGE_MARKDOWN:
             print(f"  {key}: {len(str(value))} chars (markdown)")
         elif key == output_keys.HOMEPAGE_DATA:
-            print(f"  {key}: {type(value).__name__}")
-            if isinstance(value, HomepageData):
-                print(f"    conference_name: {value.conference_name}")
-                print(f"    date_start: {value.date_start}")
-                print(f"    date_end: {value.date_end}")
-                print(f"    industry: {value.industry}")
-                print(f"    sub_pages.speakers: {value.sub_pages.speakers}")
-                print(f"    sub_pages.venue: {value.sub_pages.venue}")
-                print(f"    sub_pages.registration: {value.sub_pages.registration}")
+            print(f"  {key}:", end="")
+            if isinstance(value, dict):
+                print(f" {value.get('conference_name', '?')}")
+                print(f"    date_start: {value.get('date_start')}")
+                print(f"    date_end: {value.get('date_end')}")
+                print(f"    industry: {value.get('industry')}")
+                sp = value.get('sub_pages', {})
+                print(f"    sub_pages: speakers={sp.get('speakers')}, venue={sp.get('venue')}, registration={sp.get('registration')}")
+            elif isinstance(value, HomepageData):
+                print(f" {value.conference_name}")
             else:
-                preview = str(value)[:200]
-                print(f"    value: {preview}")
+                print(f" {type(value).__name__}")
+        elif key == output_keys.DISCOVERED_LINKS:
+            print(f"  {key}: {type(value).__name__}")
+        elif key == output_keys.PROBED_LINKS:
+            print(f"  {key}: {type(value).__name__}")
+        elif key == output_keys.SUB_PAGES_URLS:
+            print(f"  {key}: {value}")
+        elif key == output_keys.SCRAPED_SUB_PAGES:
+            text = str(value)
+            print(f"  {key}: {len(text)} chars")
+        elif key == output_keys.URL:
+            print(f"  {key}: {value}")
         else:
             preview = str(value)[:100]
             print(f"  {key}: {preview}")
@@ -88,35 +101,30 @@ async def test_sequential_orchestrator():
     # 7. Validation
     print("\n=== VALIDATION ===")
     errors = []
-    
-    if output_keys.HOMEPAGE_MARKDOWN not in updated_session.state:
-        errors.append(f"Missing {output_keys.HOMEPAGE_MARKDOWN} in state")
-    else:
-        md_len = len(updated_session.state[output_keys.HOMEPAGE_MARKDOWN])
-        print(f"[OK] {output_keys.HOMEPAGE_MARKDOWN}: {md_len} chars")
-    
-    if output_keys.HOMEPAGE_DATA not in updated_session.state:
-        errors.append(f"Missing {output_keys.HOMEPAGE_DATA} in state")
-    else:
+    expected_keys = [
+        output_keys.HOMEPAGE_MARKDOWN,
+        output_keys.HOMEPAGE_DATA,
+        output_keys.DISCOVERED_LINKS,
+        output_keys.SUB_PAGES_URLS,
+        output_keys.SCRAPED_SUB_PAGES,
+    ]
+
+    for ek in expected_keys:
+        if ek not in updated_session.state:
+            errors.append(f"Missing {ek} in state")
+        else:
+            val = updated_session.state[ek]
+            size = len(str(val))
+            print(f"[OK] {ek}: present ({size} chars)" if size > 100 else f"[OK] {ek}: present")
+
+    if output_keys.HOMEPAGE_DATA in updated_session.state:
         raw_data = updated_session.state[output_keys.HOMEPAGE_DATA]
-        # ADK output_schema stores as dict in state, convert to HomepageData
         try:
-            if isinstance(raw_data, dict):
-                data = HomepageData.model_validate(raw_data)
-                print(f"[OK] {output_keys.HOMEPAGE_DATA}: dict -> HomepageData")
-                print(f"[OK] conference_name: {data.conference_name}")
-                print(f"[OK] date_start: {data.date_start}")
-                print(f"[OK] date_end: {data.date_end}")
-                print(f"[OK] industry: {data.industry}")
-                print(f"[OK] sub_pages: speakers={data.sub_pages.speakers}, venue={data.sub_pages.venue}, registration={data.sub_pages.registration}")
-            elif isinstance(raw_data, HomepageData):
-                print(f"[OK] {output_keys.HOMEPAGE_DATA}: HomepageData object")
-                print(f"[OK] conference_name: {raw_data.conference_name}")
-            else:
-                errors.append(f"Expected dict or HomepageData, got {type(raw_data).__name__}")
+            data = HomepageData.model_validate(raw_data) if isinstance(raw_data, dict) else raw_data
+            print(f"[OK] conference_name: {data.conference_name}")
         except Exception as e:
             errors.append(f"Failed to validate HomepageData: {e}")
-    
+
     if errors:
         print("\n[FAIL] Errors:")
         for e in errors:
@@ -124,9 +132,12 @@ async def test_sequential_orchestrator():
     else:
         print("\n[PASS] All validations passed!")
         print("\nPipeline flow verified:")
-        print("  1. scrape_homepage_agent -> fetched markdown")
-        print("  2. extract_homepage_agent -> extracted HomepageData")
-        print("  3. output_key propagation working between steps")
+        print("  1. scrape_homepage_agent -> HOMEPAGE_MARKDOWN")
+        print("  2. extract_homepage_agent -> HOMEPAGE_DATA")
+        print("  3. discover_links_agent -> DISCOVERED_LINKS")
+        print("  4. probe_paths_agent -> PROBED_LINKS")
+        print("  5. merge_links_agent -> SUB_PAGES_URLS")
+        print("  6. scrape_sub_pages_agent -> SCRAPED_SUB_PAGES")
 
     # 8. Save all intermediate outputs to disk
     print("\n=== SAVING INTERMEDIATE OUTPUTS ===")
@@ -135,5 +146,6 @@ async def test_sequential_orchestrator():
     for s in saved:
         print(f"  - {s.name}")
 
+
 if __name__ == "__main__":
-    asyncio.run(test_sequential_orchestrator())
+    asyncio.run(test_full_pipeline())

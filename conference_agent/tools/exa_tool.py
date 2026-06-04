@@ -8,6 +8,8 @@ exa = Exa(api_key=os.getenv("EXA_API_KEY"))
 
 
 def search_conferences(query: str, num_results: int = 10):
+
+
     result = exa.search(
         query,
         num_results=num_results,
@@ -21,3 +23,4 @@ def search_conferences(query: str, num_results: int = 10):
         }
         for r in result.results
     ]
+
