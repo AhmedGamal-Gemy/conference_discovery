@@ -17,17 +17,15 @@ async def test_full_pipeline():
     - Valid config/settings.yaml
     """
 
-    # 1. Create session service + session
+    # 1. Create session service + session with initial state
     session_service = InMemorySessionService()
+    test_url = "https://2026.emnlp.org/"
     session = await session_service.create_session(
         app_name="conference_discovery",
         user_id="test_user",
-        session_id="test_session"
+        session_id="test_session",
+        state={output_keys.URL: test_url},
     )
-
-    # 2. Inject URL into state
-    test_url = "https://2026.emnlp.org/"
-    session.state[output_keys.URL] = test_url
     print(f"Session initialized with URL: {test_url}")
 
     # 3. Create runner with pipeline orchestrator as root
