@@ -26,8 +26,7 @@ conference_discovery/
 │   │   ├── step2_5_discover_links.py
 │   │   ├── step2_6_probe_paths.py
 │   │   ├── step3_merge_links.py
-│   │   ├── step4_scrape_sub_pages.py
-│   │   └── step_rate_limit_delay.py
+│   │   └── step4_scrape_sub_pages.py
 │   ├── tests/
 │   │   ├── test_step1_scrape_homepage.py
 │   │   ├── test_step2_extract_homepage.py
@@ -68,16 +67,12 @@ conference_discovery/
 
 ## WORKFLOW (Orchestrator Pipeline)
 
-The pipeline is a `SequentialAgent` running these 8 steps:
+The pipeline is a `Workflow` (ADK 2.0 graph) running these 6 steps:
 
 ```
 scrape_homepage  ──(output_key=URL, HOMEPAGE_MARKDOWN)──▶
        ↓
-rate_limit_delay  ──(60s between LLM calls)──▶
-       ↓
 extract_homepage  ──(output_key=HOMEPAGE_DATA)──▶
-       ↓
-rate_limit_delay  ──(60s between LLM calls)──▶
        ↓
 discover_links   ──(output_key=DISCOVERED_LINKS)──▶
        ↓
@@ -108,7 +103,7 @@ scrape_sub_pages ──(output_key=SCRAPED_SUB_PAGES)──▶
 | `probe_paths_agent` | LlmAgent | `conference_agent/steps/step2_6_probe_paths.py` | Step 2.6: probe common URL paths |
 | `merge_links_agent` | LlmAgent | `conference_agent/steps/step3_merge_links.py` | Step 3: merge → SubPages URLs |
 | `scrape_sub_pages_agent` | LlmAgent | `conference_agent/steps/step4_scrape_sub_pages.py` | Step 4: fetch sub-pages via MCP |
-| `rate_limit_delay_agent` | BaseAgent | `conference_agent/steps/step_rate_limit_delay.py` | Exponential backoff between LLM calls |
+| *(rate limiting handled natively by LiteLLM proxy)* | | | Max retries: 20, exponential backoff in proxy_config.yaml |
 
 ## CONVENTIONS
 - **Settings hierarchy**: `init_settings > env_settings > YAML > dotenv` (explicit in `SystemSettings.settings_customise_sources`). LiteLLM proxy config lives in `config.py` after settings init.
@@ -127,7 +122,7 @@ scrape_sub_pages ──(output_key=SCRAPED_SUB_PAGES)──▶
 - **DO NOT geocode before confirming speakers exist** — `travel_hours`, `is_local`, `is_usa` are blocked until geocoding step.
 - **NEVER return markdown backticks in LLM prompts** — extraction prompts explicitly demand raw JSON only.
 - **NEVER store secrets in settings.yaml** — use `conference_agent/.env`.
-- **DO NOT put 2+ LLM-heavy agents back-to-back** — always insert `rate_limit_delay_agent` between them.
+- **LiteLLM proxy handles rate limiting** — `proxy_config.yaml` configures max retries (20) and fallback models. No manual delay agents needed.
 
 ## UNIQUE STYLES
 - **MCP-first tooling**: Web scraping is an external MCP server (`scrapling_mcp_url`), not a local dependency. Agent uses `McpToolset` + `StreamableHTTPConnectionParams` with explicit Accept header.
