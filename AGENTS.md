@@ -95,7 +95,7 @@ scrape_sub_pages ──(output_key=SCRAPED_SUB_PAGES)──▶
 | `HomepageData` | model | `conference_agent/schemas/homepage.py` | Homepage extraction target |
 | `DiscoveredLinksData` | model | `conference_agent/schemas/discovered_links.py` | Link classification output |
 | `SubPages` | model | `conference_agent/schemas/homepage.py` | URLs for speakers, venue, registration |
-| `output_keys` | StrEnum | `conference_agent/schemas/output_keys.py` | Session state keys (explicit uppercase values) |
+| `output_keys` | StrEnum | `conference_agent/schemas/output_keys.py` | Session state keys (lowercase via auto()) |
 | `scrapling_toolset` | McpToolset | `conference_agent/tools/scrapling_tool.py` | MCP client with headers + timeout fix |
 | `scrape_homepage_agent` | LlmAgent | `conference_agent/steps/step1_scrape_homepage.py` | Step 1: fetch via MCP |
 | `extract_homepage_agent` | LlmAgent | `conference_agent/steps/step2_extract_homepage.py` | Step 2: extract HomepageData |
@@ -109,7 +109,7 @@ scrape_sub_pages ──(output_key=SCRAPED_SUB_PAGES)──▶
 - **Settings hierarchy**: `init_settings > env_settings > YAML > dotenv` (explicit in `SystemSettings.settings_customise_sources`). LiteLLM proxy config lives in `config.py` after settings init.
 - **LLM routing**: All LLM calls go through LiteLLM proxy at `localhost:4000`. Proxy handles retries (up to 20), fallbacks, and rate limiting.
 - **Model names**: Bare names in settings (`mistral-small`), NOT `mistral/mistral-small-latest`. The proxy resolves provider prefixes.
-- **Output keys**: `StrEnum` auto() produces lowercase strings that don't match prompt `{state.URL}` placeholders. Use explicit string values.
+- **Output keys**: `StrEnum` with `auto()` produces lowercase keys (`url`, `homepage_markdown`) matching prompt `{state.url}` placeholders.
 - **Prompt placeholders**: All extraction prompts use `{markdown}` as the single template variable.
 - **Rate limiting**: Exponential backoff with `delay = min(30 × attempt^1.5, 300)` between LLM calls. Attempt counter stored in session state.
 - **MCP headers**: Scrapling MCP requires `Accept: application/json, text/event-stream` in HTTP connection params.

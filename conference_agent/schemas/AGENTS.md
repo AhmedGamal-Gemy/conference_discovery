@@ -15,19 +15,20 @@ Strictly typed Pydantic models representing conference data. Each model maps to 
 | `DiscoveredLinksData` | `discovered_links.py` | (discover_links step) | `links: list[DiscoveredLink]` (url, link_text, category) |
 | `ValidationResult` | `validation.py` | (validation layer) | `passed`, `failed_condition`, `rejection_reason`, `date_bucket` |
 | `Conference` | `conference.py` | (composed) | Aggregates all sub-models + derived counters |
-| `output_keys` | `output_keys.py` | (pipeline contract) | `StrEnum` — explicit string values |
+| `output_keys` | `output_keys.py` | (pipeline contract) | `StrEnum` — lowercase via `auto()` |
 
 ## OUTPUT KEYS
-Defined in `output_keys.py` — all uppercase strings to match `{state.URL}` template pattern:
-- `URL = "URL"` — input target URL
-- `HOMEPAGE_MARKDOWN = "HOMEPAGE_MARKDOWN"` — scraped homepage content
-- `HOMEPAGE_DATA = "HOMEPAGE_DATA"` — extracted conference data
-- `DISCOVERED_LINKS = "DISCOVERED_LINKS"` — classified links from homepage
-- `PROBED_LINKS = "PROBED_LINKS"` — results from URL path probing
-- `SUB_PAGES_URLS = "SUB_PAGES_URLS"` — merged speaker/venue/registration URLs
-- `SCRAPED_SUB_PAGES = "SCRAPED_SUB_PAGES"` — scraped sub-page markdown
-
-> **IMPORTANT**: Must use explicit string values (not `auto()`) because `StrEnum.auto()` produces lowercase (`url`), but prompt templates reference uppercase (`{state.URL}`).
+Defined in `output_keys.py` — all lowercase via `StrEnum.auto()`:
+- `URL` — input target URL (`"url"`)
+- `HOMEPAGE_MARKDOWN` — scraped homepage content (`"homepage_markdown"`)
+- `HOMEPAGE_DATA` — extracted conference data
+- `DISCOVERED_LINKS` — classified links from homepage
+- `PROBED_LINKS` — results from URL path probing
+- `SUB_PAGES_URLS` — merged speaker/venue/registration URLs
+- `SCRAPED_SUB_PAGES` — scraped sub-page markdown
+- `SPEAKERS_DATA` — extracted speakers data
+- `VENUE_DATA` — extracted venue data
+- `REGISTRATION_DATA` — extracted registration data
 
 ## DISCOVERED LINK CATEGORIES
 The `DiscoveredLink` model uses a `Literal` type for category:
