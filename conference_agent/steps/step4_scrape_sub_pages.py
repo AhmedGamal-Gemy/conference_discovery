@@ -1,8 +1,8 @@
 """
 Step 4 — Scrape sub-pages for speakers, venue, and registration.
 
-This agent reads SUB_PAGES_URLS from state and calls stealthy_fetch
-for each URL. It returns the raw markdown content for all 3 pages.
+This agent reads SUB_PAGES_URLS from state and calls bulk_stealthy_fetch
+with all URLs at once (single tool call instead of 3 sequential calls).
 
 NO output_schema — this is a pure tool-calling agent to avoid the
 known ADK conflict between tools + output_schema in a single agent.
@@ -32,29 +32,41 @@ def _build_step4_instruction(ctx):
                 "registration": getattr(raw, "registration", None),
             }
 
-    url_lines = []
-    for key, url in urls.items():
-        if url:
-            url_lines.append(f"- {key.upper()}: {url}")
-        else:
-            url_lines.append(f"- {key.upper()}: (null — skip this one)")
+    # Collect non-null URLs into an array
+    non_null = {k: v for k, v in urls.items() if v}
+    url_list = list(non_null.values())
 
-    url_block = "\n".join(url_lines)
+    if not url_list:
+        return """You are a web scraping assistant.
+
+All 3 sub-page URLs are null — nothing to scrape. Return:
+SPEAKERS: null
+VENUE: null
+REGISTRATION: null
+"""
+
+    url_array = "\n".join(f'  "{u}"' for u in url_list)
+    labels = "\n".join(f"  - {k.upper()}: {v}" for k, v in non_null.items())
 
     return f"""You are a web scraping assistant.
 
-You have 3 URLs to scrape. For each URL that is not null:
-1. Call the stealthy_fetch tool with these exact parameters:
-   - url: <the URL>
-   - timeout: 30000
-   - solve_cloudflare: true
-   - headless: true
-   - main_content_only: true
-2. Save the returned markdown
+Scrape all sub-pages in a SINGLE call using bulk_stealthy_fetch:
 
-If a URL is null, skip it — do NOT call the tool for that one.
+Tool: bulk_stealthy_fetch
+Parameters:
+  urls: [{url_array}]
+  timeout: 30000
+  solve_cloudflare: true
+  headless: true
+  main_content_only: true
 
-After scraping ALL non-null URLs, return your results in this exact format:
+The tool returns results for all URLs simultaneously. Each result's
+markdown content corresponds to the URL at the same index in the input.
+
+Mapping (index → section):
+{labels}
+
+After the tool returns, format your response as:
 
 SPEAKERS:
 <markdown content or "null">
@@ -64,9 +76,6 @@ VENUE:
 
 REGISTRATION:
 <markdown content or "null">
-
-URLs to scrape:
-{url_block}
 """
 
 
