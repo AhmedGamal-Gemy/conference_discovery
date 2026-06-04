@@ -16,8 +16,8 @@ Conference discovery agent that scrapes conference websites, extracts structured
 ┌──────┴───────────────────┴──────────────────────────┐
 │                 ADK Workflow                        │
 │                                                      │
-│  scrape → delay → extract → delay → discover       │
-│  → probe → merge → scrape_sub_pages                 │
+│  scrape → extract → discover → probe → merge       │
+│  → scrape_sub_pages                                  │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -84,10 +84,10 @@ uv pip install -e ".[extensions]"
 uv run python conference_agent/tests/test_orchestrator.py
 ```
 
-This runs all 8 workflow steps against a target URL and validates output:
+This runs all 6 workflow steps against a target URL and validates output:
 
 ```
-scrape → [30s delay] → extract → [30s delay] → discover → probe → merge → scrape_sub_pages
+scrape → extract → discover → probe → merge → scrape_sub_pages
 ```
 
 ### Individual step tests
@@ -138,7 +138,7 @@ docker restart scrapling-mcp
 ```
 
 ### LLM calls fail with 429 (rate limited)
-The exponential backoff delay (30s base, 1.5x exponent, max 300s) handles this automatically. The LiteLLM proxy also retries internally (up to 20 retries with backoff).
+The LiteLLM proxy handles retries internally (up to 20 retries with exponential backoff). Configure in `proxy_config.yaml`.
 
 ## Project Structure
 
@@ -151,8 +151,7 @@ conference_discovery/
 │   │   ├── step2_5_discover_links.py
 │   │   ├── step2_6_probe_paths.py
 │   │   ├── step3_merge_links.py
-│   │   ├── step4_scrape_sub_pages.py
-│   │   └── step_rate_limit_delay.py
+│   │   └── step4_scrape_sub_pages.py
 │   ├── tests/
 │   │   ├── test_step1_scrape_homepage.py
 │   │   ├── test_step2_extract_homepage.py

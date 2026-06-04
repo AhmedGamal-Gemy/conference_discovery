@@ -39,7 +39,7 @@ async def test_full_pipeline():
 
     # 4. Run it
     print(f"\nRunning pipeline orchestrator (Workflow)...")
-    print("Expected flow: scrape → delay → extract → delay → discover → probe → merge → scrape_sub_pages\n")
+    print("Expected flow: scrape -> extract -> discover -> probe -> merge -> scrape_sub_pages\n")
 
     async for event in runner.run_async(
         user_id="test_user",
@@ -51,9 +51,9 @@ async def test_full_pipeline():
             part = event.content.parts[0]
             if part.text:
                 preview = part.text[:200].replace("\n", " ")
-                print(f">>> {event.author}: {preview}")
+                print(f"[{event.author}]: {preview}")
             elif part.function_call:
-                print(f">>> {event.author}: [TOOL CALL] {part.function_call.name}")
+                print(f"[{event.author}]: [TOOL CALL] {part.function_call.name}")
 
         if event.is_final_response():
             print(f"\n=== FINAL RESPONSE from {event.author} ===")
