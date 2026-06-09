@@ -196,9 +196,11 @@ Rules for venue:
 
 === REGISTRATION EXTRACTION ===
 {
-    "registration": {
-        "covers_accommodation": true or false
-    }
+  "registration": {
+    "covers_accommodation": true or false,
+    "fee_range_usd": "e.g. '400-1900 USD' or 'early bird: 300 USD / regular: 500 USD' or null if not shown",
+    "early_bird_deadline": "YYYY-MM-DD of the early-bird registration deadline, or null"
+  }
 }
 
 Rules for registration:
