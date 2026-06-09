@@ -4,7 +4,7 @@ POST /api/discovery/search — accepts topic/months_ahead, returns
 SSE stream of discovery progress + final result list.
 """
 
-import asyncio
+import time
 import json
 import logging
 from pathlib import Path
@@ -52,12 +52,12 @@ async def search_discovery(body: dict):
             }),
         }
         try:
-            results = await run_discovery(
+            results = run_discovery(
                 topic=topic,
                 months_ahead=months_ahead,
                 num_results=num_results,
             )
-            elapsed = asyncio.get_event_loop().time() - t0
+            elapsed = time.time() - t0
             items = [
                 DiscoveryResultItem(url=r["url"], title=r.get("title", ""))
                 for r in results
