@@ -44,3 +44,9 @@ output/backend.log*
 output/bulk_test_results.json
 output/mcp_test_correct.json
 
+
+# Scratch logs and runtime artifacts from manual testing
+backend*.log
+frontend*.log
+output/backend.log*
+
