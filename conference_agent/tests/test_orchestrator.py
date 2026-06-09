@@ -12,7 +12,7 @@ async def test_full_pipeline():
     """Test the full Workflow pipeline: scrape → extract → discover → probe → merge → scrape sub-pages.
 
     Prerequisites:
-    - MCP server running at http://localhost:8016/mcp
+    - MCP server running at http://localhost:8017/mcp
     - MISTRAL_API_KEY set in environment
     - Valid config/settings.yaml
     """

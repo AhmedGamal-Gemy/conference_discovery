@@ -23,3 +23,7 @@ output/intermediate/
 .opencode/
 .playwright-mcp/
 .sisyphus/
+
+# Frontend build artifacts
+web/frontend/node_modules/
+web/frontend/dist/
