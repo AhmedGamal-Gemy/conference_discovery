@@ -20,12 +20,12 @@ load_dotenv(_ROOT / "conference_agent" / ".env", override=False)
 # Import directly from schema modules to avoid conference_agent.__init__
 # which eagerly loads tools (Exa, MCP) requiring env vars.
 
-from conference_agent.schemas.speaker import Speaker
-from conference_agent.schemas.homepage import HomepageData, SubPages
-from conference_agent.schemas.venue import VenueData
-from conference_agent.schemas.registration import RegistrationData
-from conference_agent.schemas.conference import Conference
-from conference_agent.schemas.output_keys import output_keys
+from conference_agent.schemas.speaker import Speaker  # noqa: E402
+from conference_agent.schemas.homepage import HomepageData, SubPages  # noqa: E402
+from conference_agent.schemas.venue import VenueData  # noqa: E402
+from conference_agent.schemas.registration import RegistrationData  # noqa: E402
+from conference_agent.schemas.conference import Conference  # noqa: E402
+from conference_agent.schemas.output_keys import output_keys  # noqa: E402
 
 if TYPE_CHECKING:
     from conference_agent.config import SystemSettings
@@ -185,6 +185,8 @@ class RegistrationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     covers_accommodation: bool
+    fee_range_usd: Optional[str] = None
+    early_bird_deadline: Optional[str] = None
 
 
 class SubPagesResponse(BaseModel):
@@ -198,67 +200,64 @@ class SubPagesResponse(BaseModel):
 
 
 class HomepageResponse(BaseModel):
-  """Flattened homepage data for frontend."""
+    """Flattened homepage data for frontend."""
 
-  model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
-  conference_name: str
-  conference_acronym: Optional[str] = None
-  date_start: Optional[str] = None
-  date_end: Optional[str] = None
-  industry: Optional[str] = None
-  sector_tags: list[str] = []
-  conference_format: Optional[str] = None
-  organizer: Optional[str] = None
-  submission_deadline: Optional[str] = None
-  venue_city: Optional[str] = None
-  venue_country: Optional[str] = None
-  sub_pages: SubPagesResponse
+    conference_name: str
+    conference_acronym: Optional[str] = None
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None
+    industry: Optional[str] = None
+    sector_tags: list[str] = []
+    conference_format: Optional[str] = None
+    organizer: Optional[str] = None
+    submission_deadline: Optional[str] = None
+    venue_city: Optional[str] = None
+    venue_country: Optional[str] = None
+    sub_pages: SubPagesResponse
 
 
 class ConferenceResponse(BaseModel):
-  """Flattened conference model for frontend consumption."""
+    """Flattened conference model for frontend consumption.
 
-  model_config = ConfigDict(extra="forbid")
+    All fields are optional with sensible defaults — missing or null pipeline
+    data produces null/empty values in JSON, never validation errors.
+    """
 
-  # Identity
-  conference_id: str = ""
+    model_config = ConfigDict(extra="forbid")
 
-  # Homepage fields (flattened)
-  conference_name: str = ""
-  conference_acronym: Optional[str] = None
-  date_start: Optional[str] = None
-  date_end: Optional[str] = None
-  industry: Optional[str] = None
-  sector_tags: list[str] = []
-  conference_format: Optional[str] = None
-  organizer: Optional[str] = None
-  submission_deadline: Optional[str] = None
-  venue_city: Optional[str] = None
-  venue_country: Optional[str] = None
-  sub_pages: Optional[SubPagesResponse] = None
+    # Identity
+    conference_id: str = ""
 
-  # Venue fields (flattened)
-  venue_name: Optional[str] = None
-  venue_address: Optional[str] = None
-  venue_country_detail: Optional[str] = None
+    # Homepage fields (flattened)
+    conference_name: str = ""
+    conference_acronym: Optional[str] = None
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None
+    industry: Optional[str] = None
+    sector_tags: list[str] = []
+    conference_format: Optional[str] = None
+    organizer: Optional[str] = None
+    submission_deadline: Optional[str] = None
+    venue_city: Optional[str] = None
+    venue_country: Optional[str] = None
+    sub_pages: Optional[SubPagesResponse] = None
 
-  # Registration fields (flattened)
-  covers_accommodation: bool = False
-  fee_range_usd: Optional[str] = None
-  early_bird_deadline: Optional[str] = None
+    # Venue fields (flattened)
+    venue_name: Optional[str] = None
+    venue_address: Optional[str] = None
+    venue_country_detail: Optional[str] = None
 
-  # Speakers
-  speakers: list[SpeakerResponse] = []
+    # Registration fields (flattened)
+    covers_accommodation: bool = False
+    fee_range_usd: Optional[str] = None
+    early_bird_deadline: Optional[str] = None
 
-  # Derived counters
-  total_speakers: int = 0
-  non_local_count: int = 0
-  non_usa_count: int = 0
+    # Speakers
+    speakers: list[SpeakerResponse] = []
 
-  # URLs
-  website_url: str = ""
-  speakers_page_url: Optional[str] = None
+    # Derived counters
     total_speakers: int = 0
     non_local_count: int = 0
     non_usa_count: int = 0
@@ -310,6 +309,7 @@ class ConferenceResponse(BaseModel):
             date_start=conference.homepage.date_start,
             date_end=conference.homepage.date_end,
             industry=conference.homepage.industry,
+            sector_tags=conference.homepage.sector_tags,
             conference_format=conference.homepage.conference_format,
             organizer=conference.homepage.organizer,
             submission_deadline=conference.homepage.submission_deadline,
@@ -324,6 +324,8 @@ class ConferenceResponse(BaseModel):
             venue_address=conference.venue.venue_address,
             venue_country_detail=conference.venue.country,
             covers_accommodation=conference.registration.covers_accommodation,
+            fee_range_usd=conference.registration.fee_range_usd,
+            early_bird_deadline=conference.registration.early_bird_deadline,
             speakers=[
                 SpeakerResponse(
                     name=s.name,
@@ -340,9 +342,6 @@ class ConferenceResponse(BaseModel):
             total_speakers=conference.total_speakers,
             non_local_count=conference.non_local_count,
             non_usa_count=conference.non_usa_count,
-  website_url=conference.website_url,
-  speakers_page_url=conference.speakers_page_url,
-  sector_tags=conference.homepage.sector_tags,
-  fee_range_usd=conference.registration.fee_range_usd,
-  early_bird_deadline=conference.registration.early_bird_deadline,
-)
+            website_url=conference.website_url,
+            speakers_page_url=conference.speakers_page_url,
+        )
