@@ -31,6 +31,7 @@ from web.schemas import (
     DONE,
     ConferenceResponse,
     PipelineRequest,
+    PipelineBatchRequest,
 )
 from web.services.pipeline_runner import (
     PipelineRunner,
@@ -168,5 +169,152 @@ async def run_pipeline(request: Request, body: PipelineRequest):
             }
             yield {"event": DONE, "data": json.dumps({})}
             return
+
+    return EventSourceResponse(event_generator(), ping=15)
+
+
+# ── Batch pipeline ────────────────────────────────────────────────────
+
+
+@router.post("/run-batch")
+async def run_pipeline_batch(request: Request, body: PipelineBatchRequest):
+    """Run the pipeline on multiple conferences sequentially, streaming each result.
+
+    SSE events per conference:
+      - conference_start:   {url, index, total, elapsed}
+      - step_start:          {step, label, index, total, elapsed}
+      - step_complete:       {step, label, index, total, elapsed}
+      - step_error:          {step, label, index, total, error, elapsed}
+      - conference_complete: {url, conference, total_elapsed, steps_completed}
+      - conference_error:    {url, error, elapsed}
+    Then batch_complete + done.
+    """
+
+    async def event_generator():
+        urls = body.urls
+        total = len(urls)
+        t0 = asyncio.get_event_loop().time()
+
+        # Emit batch start
+        yield {
+            "event": "batch_started",
+            "data": json.dumps({
+                "total": total,
+                "urls": urls,
+                "elapsed": 0.0,
+            }),
+        }
+
+        runner = PipelineRunner()
+        step_names = runner.STEP_NAMES
+        step_index_map = {name: i + 1 for i, name in enumerate(step_names)}
+        total_steps = len(step_names)
+
+        for idx, url in enumerate(urls, start=1):
+            conf_t0 = asyncio.get_event_loop().time()
+            session_id = f"batch_{body.user_id}_{idx}"
+
+            if await request.is_disconnected():
+                yield {
+                    "event": "conference_error",
+                    "data": json.dumps({
+                        "url": url,
+                        "error": "Client disconnected",
+                        "elapsed": round(asyncio.get_event_loop().time() - conf_t0, 1),
+                    }),
+                }
+                continue
+
+            # Signal this conference started
+            yield {
+                "event": "conference_start",
+                "data": json.dumps({
+                    "url": url,
+                    "index": idx,
+                    "total": total,
+                    "elapsed": round(asyncio.get_event_loop().time() - t0, 1),
+                }),
+            }
+
+            try:
+                async for evt in runner.run(url=url, user_id=body.user_id, session_id=session_id):
+                    if isinstance(evt, RunnerStep):
+                        data = {
+                            "url": url,
+                            "step": evt.step_name,
+                            "label": evt.step_label,
+                            "index": idx,
+                            "total": total,
+                            "steps_total": total_steps,
+                            "step_index": step_index_map.get(evt.step_name, 0),
+                            "elapsed": round(evt.elapsed, 1),
+                        }
+                        if evt.status == "start":
+                            yield {"event": "step_start", "data": json.dumps(data)}
+                        elif evt.status == "complete":
+                            yield {"event": "step_complete", "data": json.dumps(data)}
+                        elif evt.status == "error":
+                            yield {"event": "step_error", "data": json.dumps({**data, "error": evt.error})}
+
+                    elif isinstance(evt, PipelineResult):
+                        state = evt.state or {}
+                        base_url = state.get(output_keys.URL, "")
+
+                        # URL resolution (same fixup as run_pipeline)
+                        if base_url:
+                            homepage_data = state.get(output_keys.HOMEPAGE_DATA, {})
+                            if isinstance(homepage_data, dict):
+                                sub_pages = homepage_data.get("sub_pages", {})
+                                for key in ("speakers", "venue", "registration"):
+                                    if sub_pages.get(key):
+                                        sub_pages[key] = urljoin(base_url, sub_pages[key])
+                            discovered_links = state.get(output_keys.DISCOVERED_LINKS, {})
+                            if isinstance(discovered_links, dict):
+                                for link in discovered_links.get("links", []):
+                                    if link.get("url"):
+                                        link["url"] = urljoin(base_url, link["url"])
+                            sub_pages_urls = state.get(output_keys.SUB_PAGES_URLS, {})
+                            if isinstance(sub_pages_urls, dict):
+                                for key in ("speakers", "venue", "registration"):
+                                    if sub_pages_urls.get(key):
+                                        sub_pages_urls[key] = urljoin(base_url, sub_pages_urls[key])
+
+                        conference_dict = (
+                            ConferenceResponse.from_pipeline_state(state).model_dump()
+                            if state.get(output_keys.CONFERENCE_DATA)
+                            else None
+                        )
+
+                        yield {
+                            "event": "conference_complete",
+                            "data": json.dumps({
+                                "url": url,
+                                "conference": conference_dict,
+                                "total_elapsed": round(evt.total_elapsed, 1),
+                                "steps_completed": evt.steps_completed,
+                                "elapsed": round(evt.total_elapsed, 1),
+                            }),
+                        }
+
+            except Exception as exc:
+                logger.exception("Batch conference error for %s: %s", url, exc)
+                yield {
+                    "event": "conference_error",
+                    "data": json.dumps({
+                        "url": url,
+                        "error": str(exc),
+                        "elapsed": round(asyncio.get_event_loop().time() - conf_t0, 1),
+                    }),
+                }
+
+        # Final batch complete
+        yield {
+            "event": "batch_complete",
+            "data": json.dumps({
+                "total": total,
+                "elapsed": round(asyncio.get_event_loop().time() - t0, 1),
+            }),
+        }
+        yield {"event": DONE, "data": json.dumps({})}
 
     return EventSourceResponse(event_generator(), ping=15)

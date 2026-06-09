@@ -53,6 +53,13 @@ class PipelineRequest(BaseModel):
     user_id: str = "web_user"
 
 
+class PipelineBatchRequest(BaseModel):
+    """Request to run the pipeline on multiple conferences sequentially."""
+
+    urls: list[str]
+    user_id: str = "web_user"
+
+
 class StepProgress(BaseModel):
     """Progress update for a single pipeline step (emitted via SSE)."""
 

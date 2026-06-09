@@ -8,11 +8,10 @@ from web.api import router as api_router
 from web.api.pipeline import router as pipeline_router
 from web.api.discovery import router as discovery_router
 
-# ── Logging configuration ─────────────────────────────────────────────
 _log_level = logging.DEBUG if "--debug" in sys.argv else logging.INFO
 logging.basicConfig(
     level=_log_level,
-    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
     datefmt="%H:%M:%S",
     stream=sys.stdout,
 )
@@ -30,9 +29,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-app.include_router(api_router, prefix="/api")
-app.include_router(pipeline_router)
-app.include_router(discovery_router)
+    app.include_router(api_router, prefix="/api")
+    app.include_router(pipeline_router)
+    app.include_router(discovery_router, prefix="/api/discovery")
 
     @app.get("/health")
     def health():
