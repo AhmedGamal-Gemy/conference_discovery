@@ -360,7 +360,8 @@ Assemble them into this exact JSON structure:
         "conference_acronym": "from HOMEPAGE_DATA",
         "date_start": "from HOMEPAGE_DATA",
         "date_end": "from HOMEPAGE_DATA",
-        "industry": "from HOMEPAGE_DATA",
+"industry": "from HOMEPAGE_DATA",
+  "sector_tags": "from HOMEPAGE_DATA.sector_tags (list of topic tags, empty list if none)",
         "conference_format": "from HOMEPAGE_DATA",
         "organizer": "from HOMEPAGE_DATA",
         "submission_deadline": "from HOMEPAGE_DATA",
@@ -379,9 +380,11 @@ Assemble them into this exact JSON structure:
         "country": "from SUB_PAGES_DATA.venue.country or HOMEPAGE_DATA.venue_country",
         "is_hotel": "from SUB_PAGES_DATA.venue.is_hotel or false"
     },
-    "registration": {
-        "covers_accommodation": "from SUB_PAGES_DATA.registration.covers_accommodation or false"
-    },
+"registration": {
+  "covers_accommodation": "from SUB_PAGES_DATA.registration.covers_accommodation or false",
+  "fee_range_usd": "from SUB_PAGES_DATA.registration.fee_range_usd or null",
+  "early_bird_deadline": "from SUB_PAGES_DATA.registration.early_bird_deadline or null"
+},
     "speakers": "list from SUB_PAGES_DATA.speakers.speakers (include ALL speakers, or empty list)",
     "total_speakers": "length of speakers list",
     "non_local_count": "count of speakers where is_local is false or null, 0 if empty list",

@@ -1,10 +1,10 @@
-"""Discovery endpoint — searches for conferences via Exa + LLM filter.
+"""Discovery endpoint - searches for conferences via Exa + LLM filter.
 
-POST /api/discovery/search — accepts topic/months_ahead, returns
+POST /api/discovery/search - accepts topic/months_ahead, returns
 SSE stream of discovery progress + final result list.
 """
 
-import time
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -52,12 +52,13 @@ async def search_discovery(body: dict):
             }),
         }
         try:
-            results = run_discovery(
-                topic=topic,
-                months_ahead=months_ahead,
-                num_results=num_results,
+            # Run sync discovery in thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: run_discovery(topic, months_ahead, num_results)
             )
-            elapsed = time.time() - t0
+            elapsed = asyncio.get_event_loop().time() - t0
             items = [
                 DiscoveryResultItem(url=r["url"], title=r.get("title", ""))
                 for r in results
