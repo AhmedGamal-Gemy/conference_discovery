@@ -12,7 +12,7 @@ Three services must be running for the pipeline:
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
-| Scrapling MCP | `pyd4vinci/scrapling:latest` | 8016 | Stealth web scraping (cloudflare bypass) |
+| Scrapling MCP | `pyd4vinci/scrapling:latest` | 8017 | Stealth web scraping (cloudflare bypass) |
 | LiteLLM Proxy | `ghcr.io/berriai/litellm:main-latest` | 4000 | OpenAI-compatible proxy to Mistral |
 | PostgreSQL | `postgres:16` | 5432 | LiteLLM usage/spend tracking |
 
@@ -133,8 +133,9 @@ scrape_sub_pages ──(output_key=SCRAPED_SUB_PAGES)──▶
 ## COMMANDS
 ```bash
 # Start Docker infrastructure
-docker run -d -p 8016:8016 --name scrapling-mcp --restart unless-stopped \
-  pyd4vinci/scrapling:latest mcp --http --port 8016
+# Now in docker-compose.yml — `docker compose up -d`
+# docker run -d -p 8017:8017 --name scrapling-mcp --restart unless-stopped \
+#   pyd4vinci/scrapling:latest mcp --http --port 8017
 docker compose up -d
 
 # Run agent entry point
@@ -156,7 +157,7 @@ uv pip install -e ".[extensions]"
 
 ## NOTES
 - `main.py` is currently a stub (`print("Hello from conference-discovery!")`). Real entry point is `conference_agent/` package.
-- Scrapling MCP server must be running locally at `http://localhost:8016/mcp`. Use `--http --port 8016` flags; default `stdio` transport won't work with ADK.
+- Scrapling MCP server must be running locally at `http://localhost:8017/mcp` (defined in `docker-compose.yml`).
 - `conference_agent/.env` contains ALL secrets. Do NOT commit to git (already in `.gitignore`).
 - `output/intermediate/` saves pipeline state snapshots via `save_intermediate` tool.
 - Tests live in `conference_agent/tests/` (root `tests/` removed).

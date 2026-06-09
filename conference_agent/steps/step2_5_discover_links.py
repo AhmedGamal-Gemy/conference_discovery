@@ -12,7 +12,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.discovered_links import DiscoveredLinksData
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.prompts.extraction import DISCOVER_LINKS_PROMPT
-from conference_agent.steps._callbacks import strip_markdown_codeblock
+from conference_agent.steps._callbacks import strip_markdown_codeblock, resolve_relative_urls
 
 
 discover_links_agent = LlmAgent(
@@ -22,5 +22,5 @@ discover_links_agent = LlmAgent(
     instruction=DISCOVER_LINKS_PROMPT,
     output_schema=DiscoveredLinksData,
     output_key=output_keys.DISCOVERED_LINKS,
-    after_model_callback=strip_markdown_codeblock,
+    after_model_callback=[strip_markdown_codeblock, resolve_relative_urls],
 )

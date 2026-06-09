@@ -1,4 +1,11 @@
 services:
+  scrapling-mcp:
+    image: pyd4vinci/scrapling:latest
+    ports:
+      - "8017:8017"
+    command: ["mcp", "--http", "--port", "8017"]
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -22,9 +29,10 @@ services:
       - "4000:4000"
     volumes:
       - ./proxy_config.yaml:/app/proxy_config.yaml
+    env_file:
+      - conference_agent/.env
     environment:
       - DATABASE_URL=postgresql://litellm:litellm@db:5432/litellm
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - MAX_RETRY_DELAY=120
       - INITIAL_RETRY_DELAY=1
     command: ["--config", "/app/proxy_config.yaml", "--port", "4000"]

@@ -1,0 +1,19 @@
+# Conference Discovery
+# Primary dependency management: pyproject.toml + uv
+# Install with: uv pip install -e ".[extensions]"
+#
+# This file mirrors pyproject.toml for environments/tools
+# that require requirements.txt. Keep in sync with [project] dependencies.
+
+exa-py>=2.13.0
+fastapi>=0.115.0
+google-adk[extensions]>=2.1.0
+litellm>=1.83.14
+pydantic-settings[yaml]>=2.14.1
+python-dateutil>=2.9.0.post0
+python-dotenv>=1.2.2
+python-multipart>=0.0.18
+pyyaml>=6.0.3
+scrapling[ai]>=0.2.99
+sse-starlette>=2.2.0
+uvicorn>=0.34.0

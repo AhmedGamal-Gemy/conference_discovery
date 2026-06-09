@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["conference_agent*"]
+include = ["conference_agent*", "web*"]
 
 [project]
 name = "conference-discovery"
@@ -14,11 +14,15 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "exa-py>=2.13.0",
+    "fastapi>=0.115.0",
     "google-adk[extensions]>=2.1.0",
     "litellm>=1.83.14",
     "pydantic-settings[yaml]>=2.14.1",
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.18",
     "pyyaml>=6.0.3",
     "scrapling[ai]>=0.2.99",
+    "sse-starlette>=2.2.0",
+    "uvicorn>=0.34.0",
 ]

@@ -5,7 +5,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.homepage import HomepageData
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.prompts.extraction import HOMEPAGE_EXTRACTION_PROMPT
-
+from conference_agent.steps._callbacks import strip_markdown_codeblock, resolve_relative_urls
 
 
 extract_homepage_agent = LlmAgent(
@@ -15,5 +15,6 @@ extract_homepage_agent = LlmAgent(
     instruction=HOMEPAGE_EXTRACTION_PROMPT,
     output_key=output_keys.HOMEPAGE_DATA,
     output_schema=HomepageData,
+    after_model_callback=[strip_markdown_codeblock, resolve_relative_urls],
 )
 

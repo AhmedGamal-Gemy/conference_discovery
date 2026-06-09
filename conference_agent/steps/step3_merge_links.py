@@ -13,7 +13,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.homepage import SubPages
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.prompts.extraction import MERGE_LINKS_PROMPT
-from conference_agent.steps._callbacks import strip_markdown_codeblock
+from conference_agent.steps._callbacks import strip_markdown_codeblock, resolve_relative_urls
 
 
 merge_links_agent = LlmAgent(
@@ -23,5 +23,5 @@ merge_links_agent = LlmAgent(
     instruction=MERGE_LINKS_PROMPT,
     output_schema=SubPages,
     output_key=output_keys.SUB_PAGES_URLS,
-    after_model_callback=strip_markdown_codeblock,
+    after_model_callback=[strip_markdown_codeblock, resolve_relative_urls],
 )

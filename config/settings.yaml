@@ -43,6 +43,6 @@ llm:
     model: "mistral-small"
     temperature: 0.0
 
-scrapling_mcp_url: "http://localhost:8016/mcp"
+scrapling_mcp_url: "http://localhost:8017/mcp"
 
 debug : true

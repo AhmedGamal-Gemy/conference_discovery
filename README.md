@@ -1,188 +1,247 @@
 # Conference Discovery
 
-Conference discovery agent that scrapes conference websites, extracts structured data via LLM prompts, and validates conferences against configurable criteria (speaker count, travel time, dates). Built with Google ADK + Pydantic + LiteLLM.
+Conference discovery agent that scrapes conference websites, extracts structured data via LLM prompts, and validates conferences against configurable criteria (speaker count, travel time, dates).
+
+Built with **Google ADK** + **Pydantic** + **LiteLLM proxy** + **Scrapling MCP**.
 
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Scrapling  │     │  LiteLLM     │     │  Mistral     │
-│  MCP Server │────▶│  Proxy       │────▶│  API         │
-│  :8016      │     │  :4000       │     │              │
-└─────────────┘     └──────────────┘     └──────────────┘
-       ▲                   ▲
-       │  MCP SSE          │  OpenAI-compat
-       │                   │
-┌──────┴───────────────────┴──────────────────────────┐
-│                 ADK Workflow                        │
-│                                                      │
-│  scrape → extract → discover → probe → merge       │
-│  → scrape_sub_pages                                  │
-└──────────────────────────────────────────────────────┘
+┌──────────────┐         ┌──────────────┐         ┌───────────┐
+│  Scrapling   │───MCP──▶│  LiteLLM     │──OpenAI─▶│  Mistral  │
+│  MCP Server  │  SSE    │  Proxy       │ compat   │  API      │
+│  :8017       │         │  :4000       │          │           │
+└──────────────┘         └──────────────┘         └───────────┘
+                                                        ▲
+                                                         │  LLM calls
+                          ┌──────────────────────────────┘
+                          │
+                    ┌─────┴──────────────────────────────────┐
+                    │  ADK Workflow Pipeline (8 steps)        │
+                    │                                        │
+                    │  1. scrape_homepage                     │
+                    │  2. extract_homepage                    │
+                    │  3. discover_links                      │
+                    │  4. probe_paths                         │
+                    │  5. merge_links                         │
+                    │  6. scrape_sub_pages                    │
+                    │  7. extract_sub_pages                   │
+                    │  8. assemble_conference                 │
+                    └────────────────────────────────────────┘
 ```
+
+---
 
 ## Prerequisites
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) for dependency management
-- Docker Desktop
-- Mistral API key (free tier works)
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.12+ | Runtime |
+| [uv](https://docs.astral.sh/uv/) | latest | Dependency management |
+| Docker Desktop | — | LiteLLM proxy + PostgreSQL + Scrapling MCP |
+| Mistral API key | — | LLM provider (free tier works) |
 
-## Setup
+---
 
-### 1. Start Docker Infrastructure
-
-Start all services (Scrapling MCP, LiteLLM proxy, PostgreSQL):
+## Quick Start
 
 ```bash
-# Start Scrapling MCP server
-docker run -d -p 8016:8016 --name scrapling-mcp --restart unless-stopped \
-  pyd4vinci/scrapling:latest mcp --http --port 8016
+# 1. Clone + install
+git clone <repo-url> && cd conference_discovery
+cp conference_agent/.env.example conference_agent/.env   # then fill in your keys
+uv pip install -e ".[extensions]"
 
-# Start LiteLLM proxy + database
+# 2. Start Docker infrastructure
+docker compose up -d
+
+# 3. Run the full pipeline against any conference URL
+uv run python run_pipeline.py https://2026.emnlp.org/
+```
+
+That's it. The pipeline scrapes, extracts, discovers links, probes sub-pages, and assembles a structured `Conference` object.
+
+---
+
+## Setup (detailed)
+
+### 1. Environment variables
+
+Copy the example file and fill in real values:
+
+```bash
+cp conference_agent/.env.example conference_agent/.env
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MISTRAL_API_KEY` | ✅ | Your Mistral API key (get one at [console.mistral.ai](https://console.mistral.ai)) |
+| `EXA_API_KEY` | ✅ (for discovery) | Exa search API key (get one at [exa.ai](https://exa.ai)) |
+| `LITELLM_PROXY_API_KEY` | ✅ | Must match `master_key` in `proxy_config.yaml` |
+| `LITELLM_PROXY_API_BASE` | optional | Defaults to `http://localhost:4000` |
+
+### 2. Start services
+
+```bash
 docker compose up -d
 ```
 
-Verify both are running:
+Three services start automatically:
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `scrapling-mcp` | 8017 | Stealth web scraping (Cloudflare bypass) |
+| `litellm-proxy` | 4000 | OpenAI-compatible proxy to Mistral |
+| `db` (PostgreSQL 16) | 5432 | LiteLLM usage/spend tracking |
+
+Verify they're running:
 
 ```bash
-# Scrapling MCP (expects SSE — returns expected error on plain HTTP)
-curl http://localhost:8016/mcp
-# → {"jsonrpc":"2.0",...,"Not Acceptable: Client must accept text/event-stream"}
+# Scrapling MCP — returns "Not Acceptable: Client must accept text/event-stream" on plain HTTP (expected)
+curl -H "Accept: text/event-stream" http://localhost:8017/mcp
 
 # LiteLLM proxy
-curl http://localhost:4000/models \
-  -H "Authorization: Bearer sk-GE_MBZsUSFrR3FQ86lZ8hg"
-# → {"data":[{"id":"mistral-small",...}]}
+curl http://localhost:4000/models
 ```
 
-### 2. Configure Environment
-
-Create `conference_agent/.env` (already exists if cloned with secrets):
-
-```env
-MISTRAL_API_KEY=your-mistral-api-key-here
-EXA_API_KEY=your-exa-api-key-here
-
-# LiteLLM Proxy Configuration
-LITELLM_PROXY_API_BASE=http://localhost:4000
-LITELLM_PROXY_API_KEY=sk-GE_MBZsUSFrR3FQ86lZ8hg
-PROXY_MASTER_KEY=sk-1234
-```
-
-### 3. Install Dependencies
+### 3. Install dependencies
 
 ```bash
 uv pip install -e ".[extensions]"
 ```
 
+---
+
 ## Running the Pipeline
 
-### Full pipeline test (recommended)
+### Full pipeline CLI (recommended)
 
 ```bash
-uv run python conference_agent/tests/test_orchestrator.py
+uv run python run_pipeline.py <URL>
 ```
 
-This runs all 6 workflow steps against a target URL and validates output:
+Runs all 8 steps end-to-end and prints a summary of the assembled `Conference` object. Output saved to `output/intermediate/`.
 
-```
-scrape → extract → discover → probe → merge → scrape_sub_pages
-```
+Default URL if none provided: `https://2026.emnlp.org/`
 
 ### Individual step tests
 
 ```bash
-# Step 1: scrape homepage via Scrapling MCP
+# Step 1: scrape homepage
 uv run python conference_agent/tests/test_step1_scrape_homepage.py
 
 # Step 2: extract structured data from markdown
 uv run python conference_agent/tests/test_step2_extract_homepage.py
 
-# Test scrapling tool directly
-uv run python conference_agent/tools/scrapling_tool.py
+# Full pipeline (pytest style, no CLI args)
+uv run python conference_agent/tests/test_orchestrator.py
 ```
 
-### Output
+### Web API
 
-Pipeline outputs are saved to `output/intermediate/`:
-- `orchestrator_HOMEPAGE_MARKDOWN.md` — raw scraped homepage
-- `orchestrator_HOMEPAGE_DATA.json` — extracted conference data
-- `orchestrator_DISCOVERED_LINKS.json` — all links found
-- `orchestrator_PROBED_LINKS.md` — URL path probing results
-- `orchestrator_SUB_PAGES_URLS.json` — merged sub-page URLs
-- `orchestrator_SCRAPED_SUB_PAGES.md` — scraped speakers/venue/registration
+```bash
+# Start the FastAPI web server (port 8001)
+uv run python web/main.py
+```
+
+---
 
 ## Configuration
 
-Edit `config/settings.yaml`:
+All tuning lives in `config/settings.yaml`. Key knobs:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `discovery.topic` | `"medical"` | Conference search topic |
-| `validation.min_speakers` | `5` | Min speakers to pass validation |
-| `validation.min_travel_hours` | `4` | Min travel hours from local |
-| `llm.orchestrator.model` | `mistral-small` | LLM model (via proxy) |
-| `llm.extraction.temperature` | `0.1` | Extraction LLM temperature |
+| `discovery.topic` | `"medical"` | Search topic for conference discovery |
+| `discovery.months_ahead` | `3` | How many months ahead to look |
+| `validation.min_speakers` | `5` | Min confirmed speakers to pass |
+| `validation.min_non_local` | `5` | Min non-local speakers for US/local classification |
+| `validation.min_travel_hours` | `4` | Min travel hours to be considered "non-local" |
+| `llm.orchestrator.model` | `"mistral-small"` | Model for orchestration steps |
+| `llm.extraction.temperature` | `0.1` | Temperature for extraction (lower = more deterministic) |
+
+LLM retry behavior: configured in `proxy_config.yaml` (`num_retries: 20`, exponential backoff). The proxy handles rate limiting — no client-side delays needed.
+
+---
+
+## Project Structure
+
+```
+conference_discovery/
+├── conference_agent/            # Core agent package
+│   ├── steps/                   # ADK step agents (8-step pipeline)
+│   │   ├── step1_scrape_homepage.py
+│   │   ├── step2_extract_homepage.py
+│   │   ├── step2_5_discover_links.py
+│   │   ├── step2_6_probe_paths.py
+│   │   ├── step3_merge_links.py
+│   │   ├── step4_scrape_sub_pages.py
+│   │   ├── step5_extract_sub_pages.py
+│   │   └── step6_assemble_conference.py
+│   ├── tests/                   # Test suite
+│   │   ├── test_step1_scrape_homepage.py
+│   │   ├── test_step2_extract_homepage.py
+│   │   └── test_orchestrator.py
+│   ├── agent.py                 # Root ADK LlmAgent
+│   ├── config.py                # SystemSettings + LiteLLM proxy setup
+│   ├── orchestrator.py          # Workflow pipeline (8 steps)
+│   ├── prompts/                 # LLM extraction prompt templates
+│   ├── schemas/                 # Pydantic models (Conference, HomepageData, …)
+│   └── tools/                   # MCP + utility tools
+│       ├── scrapling_tool.py    # MCP client for stealthy_fetch
+│       ├── path_probe.py        # URL path probing
+│       ├── discovery_tool.py    # Exa search
+│       ├── exa_tool.py          # Exa API wrapper
+│       ├── query_generator.py   # Search query generation
+│       ├── relevance_filter.py  # Relevance scoring
+│       └── intermediate_output.py # Session state → disk
+├── web/                         # FastAPI web app (port 8001)
+│   ├── main.py                  # App entry point
+│   ├── app.py                   # FastAPI app factory
+│   ├── api/                     # Route handlers
+│   ├── schemas.py               # API schemas
+│   ├── services/                # Business logic
+│   └── frontend/                # Frontend assets
+├── config/
+│   └── settings.yaml            # YAML settings (LLM, validation, discovery)
+├── output/
+│   └── intermediate/            # Pipeline state snapshots (gitignored)
+├── docker-compose.yml           # All infra (Scrapling, LiteLLM, PostgreSQL)
+├── proxy_config.yaml            # LiteLLM model list + retry config
+├── run_pipeline.py              # CLI entry point for the full pipeline
+├── main.py                      # Project entry point
+└── pyproject.toml               # Package metadata + dependencies
+```
+
+---
 
 ## Troubleshooting
 
 ### LiteLLM proxy not responding
 ```bash
 docker compose restart litellm-proxy
+docker compose logs litellm-proxy   # inspect logs
 ```
 
 ### Scrapling MCP server down
 ```bash
 docker restart scrapling-mcp
+docker logs scrapling-mcp
 ```
 
 ### LLM calls fail with 429 (rate limited)
-The LiteLLM proxy handles retries internally (up to 20 retries with exponential backoff). Configure in `proxy_config.yaml`.
+The LiteLLM proxy handles retries internally (up to 20 per `proxy_config.yaml`). If you're hitting limits, consider reducing `rpm` or increasing `num_retries`.
 
-## Project Structure
+### Zombie Docker containers won't stop
+```bash
+wsl --shutdown   # Windows only — last resort for hung containers
+```
 
-```
-conference_discovery/
-├── conference_agent/         # Core agent package
-│   ├── steps/                # ADK step agents
-│   │   ├── step1_scrape_homepage.py
-│   │   ├── step2_extract_homepage.py
-│   │   ├── step2_5_discover_links.py
-│   │   ├── step2_6_probe_paths.py
-│   │   ├── step3_merge_links.py
-│   │   └── step4_scrape_sub_pages.py
-│   ├── tests/
-│   │   ├── test_step1_scrape_homepage.py
-│   │   ├── test_step2_extract_homepage.py
-│   │   └── test_orchestrator.py
-│   ├── agent.py              # Root LLM agent
-│   ├── config.py             # SystemSettings (YAML + env)
-│   ├── orchestrator.py       # Workflow pipeline
-│   ├── prompts/
-│   │   └── extraction.py     # LLM extraction prompts
-│   ├── schemas/              # Pydantic models
-│   │   ├── conference.py
-│   │   ├── homepage.py
-│   │   ├── discovered_links.py
-│   │   ├── speaker.py
-│   │   ├── venue.py
-│   │   ├── registration.py
-│   │   ├── validation.py
-│   │   └── output_keys.py
-│   └── tools/
-│       ├── scrapling_tool.py # MCP client for stealthy_fetch
-│       ├── path_probe.py     # URL path probing
-│       ├── discovery_tool.py # Exa search
-│       ├── exa_tool.py       # Exa API wrapper
-│       ├── query_generator.py
-│       ├── relevance_filter.py
-│       └── intermediate_output.py
-├── config/
-│   └── settings.yaml         # All config (LLM, validation, etc.)
-├── docker-compose.yml        # LiteLLM proxy + PostgreSQL
-├── proxy_config.yaml         # LiteLLM proxy settings
-├── output/
-│   └── intermediate/         # Pipeline state snapshots
-└── main.py                   # Entry point (stub)
-```
+---
+
+## Key Conventions
+
+- **Settings hierarchy**: `init > env > YAML > dotenv` (explicit in `SystemSettings.settings_customise_sources`)
+- **All LLM calls route through LiteLLM proxy** at `localhost:4000` — never set `litellm.api_base` directly
+- **Model names are bare**: use `"mistral-small"` in config, the proxy resolves the provider prefix
+- **MCP headers**: Scrapling requires `Accept: application/json, text/event-stream` in connection params
+- **Never store secrets in `settings.yaml`** — use `conference_agent/.env` (already in `.gitignore`)
