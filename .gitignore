@@ -27,3 +27,20 @@ output/intermediate/
 # Frontend build artifacts
 web/frontend/node_modules/
 web/frontend/dist/
+
+# Runtime logs
+*.log
+*.err
+
+# Test artifacts
+test_bulk_fetch.py
+test_mcp_correct.py
+test_url_resolver.py
+*.png
+
+# Conference scratch files
+scholarsforum_*.md
+output/backend.log*
+output/bulk_test_results.json
+output/mcp_test_correct.json
+
