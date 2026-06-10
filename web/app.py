@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 from fastapi import FastAPI
@@ -21,9 +22,15 @@ logging.getLogger("web").setLevel(_log_level)
 def create_app() -> FastAPI:
     app = FastAPI(title="Conference Discovery")
 
+    allowed_origins = [
+        o.strip()
+        for o in (os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(","))
+        if o.strip()
+    ]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

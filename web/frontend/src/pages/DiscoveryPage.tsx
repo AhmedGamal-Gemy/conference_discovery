@@ -247,7 +247,7 @@ export default function DiscoveryPage() {
     <div data-testid="discovery-page" className="discovery-page">
       <nav className="breadcrumb text-sm text-muted-foreground mb-4">
         <Link to="/" className="hover:underline">Home</Link>
-        <span className="mx-2">></span>
+        <span className="mx-2">{'›'}</span>
         <span>Discovery</span>
       </nav>
 

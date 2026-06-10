@@ -106,7 +106,7 @@ import os as _os
 # https://docs.litellm.ai/docs/tutorials/google_adk#5-using-litellm-proxy-with-adk
 _litellm_proxy_key = _os.environ.get(
     "LITELLM_PROXY_API_KEY",
-    "sk-GE_MBZsUSFrR3FQ86lZ8hg",
+    "sk-1234",
 )
 _os.environ["LITELLM_PROXY_API_KEY"] = _litellm_proxy_key
 _os.environ.setdefault("LITELLM_PROXY_API_BASE", "http://localhost:4000")
