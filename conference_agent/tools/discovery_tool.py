@@ -7,7 +7,7 @@ Flow:
 2. Search Exa for each query
 3. Deduplicate results by URL
 4. LLM relevance filter on each unique result (sync litellm.completion)
-5. Return clean list of {url, title}
+5. Yield {url, title} per accepted conference (incremental)
 """
 
 import logging
@@ -24,10 +24,11 @@ def run_discovery(
     topic: str | None = None,
     months_ahead: int | None = None,
     num_results: int | None = None,
-) -> list[dict]:
-    """Run the full discovery pipeline and return accepted conference URLs.
+):
+    """Run the full discovery pipeline, yielding accepted conferences incrementally.
 
-    Fully synchronous - safe to call from ADK FunctionTool.
+    Yields dicts of {url, title, raw} per accepted conference.
+    Fully synchronous - safe to call from ADK FunctionTool or thread pool.
     """
     topic = topic or settings.discovery.topic
     months_ahead = months_ahead or settings.discovery.months_ahead
@@ -38,10 +39,8 @@ def run_discovery(
         topic, months_ahead, num_results,
     )
 
-    # Step 1: generate time-bounded search queries
     queries = generate_queries(topic, months_ahead)
 
-    # Step 2: Exa search for each query
     raw_results: list[dict] = []
     for query in queries:
         try:
@@ -52,7 +51,6 @@ def run_discovery(
 
     logger.info("Discovery raw results: %d", len(raw_results))
 
-    # Step 3: deduplicate by URL
     seen: dict[str, dict] = {}
     for r in raw_results:
         url = r.get("url", "")
@@ -61,8 +59,6 @@ def run_discovery(
     deduped = list(seen.values())
     logger.info("Discovery after dedup: %d", len(deduped))
 
-    # Step 4: LLM relevance filter (sequential, sync)
-    clean_results: list[dict] = []
     for r in deduped:
         try:
             relevant = is_relevant_conference(
@@ -72,12 +68,9 @@ def run_discovery(
                 url=r.get("url", ""),
             )
             if relevant:
-                clean_results.append({
-                    "url": r["url"],
-                    "title": r.get("title", ""),
-                })
+                logger.debug("Discovery accepted: %s", r.get("url"))
+                yield {"url": r["url"], "title": r.get("title", ""), "raw": r}
         except Exception as exc:
             logger.warning("Relevance filter error for %r: %s", r.get("url"), exc)
 
-    logger.info("Discovery accepted: %d / %d", len(clean_results), len(deduped))
-    return clean_results
+    logger.info("Discovery complete")

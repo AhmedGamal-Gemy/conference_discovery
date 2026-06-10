@@ -5,7 +5,7 @@ import { usePipeline } from '../hooks/usePipeline';
 import { usePipelineBatch, type BatchConference } from '../hooks/usePipelineBatch';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Play, X, ChevronDown, ChevronRight, CheckCircle2, Circle, XCircle, Loader2 } from 'lucide-react';
+import { Play, X, ChevronDown, ChevronRight, CheckCircle2, Circle, XCircle, Loader2, RotateCcw } from 'lucide-react';
 import type { Conference } from '../types/conference';
 import type { PipelineStep } from '../types/pipeline';
 
@@ -20,6 +20,17 @@ const PIPELINE_STEPS = [
   'assemble_conference',
 ];
 
+const STEP_LABELS: Record<string, string> = {
+  scrape_homepage: 'Scraping homepage...',
+  extract_homepage: 'Extracting homepage...',
+  discover_links: 'Discovering links...',
+  probe_paths: 'Probing paths...',
+  merge_links: 'Merging links...',
+  scrape_sub_pages: 'Scraping sub-pages...',
+  extract_sub_pages: 'Extracting sub-pages...',
+  assemble_conference: 'Assembling conference...',
+};
+
 function StepIndicator({ steps, step }: { steps: PipelineStep[]; step: string }) {
   const stepData = steps.find(s => s.step === step);
   if (!stepData) return <Circle className="size-3.5 text-muted-foreground/40" />;
@@ -28,14 +39,23 @@ function StepIndicator({ steps, step }: { steps: PipelineStep[]; step: string })
   return <Loader2 className="size-3.5 text-primary animate-spin" />;
 }
 
-function StepProgressBar({ steps }: { steps: PipelineStep[] }) {
+function StepProgressBar({ steps, showLabel = false }: { steps: PipelineStep[]; showLabel?: boolean }) {
+  const completedCount = steps.filter(s => s.status === 'complete').length;
+  const totalSteps = PIPELINE_STEPS.length;
+  const currentStep = steps.find(s => s.status === 'start' || s.status === 'complete' && steps.filter(st => st.status === 'complete').length - 1 === steps.indexOf(s));
+
   return (
     <div className="flex items-center gap-1">
-      {PIPELINE_STEPS.map(step => (
+      {PIPELINE_STEPS.map((step, idx) => (
         <div key={step} title={step} className="flex items-center">
           <StepIndicator steps={steps} step={step} />
         </div>
       ))}
+      {showLabel && (
+        <span className="ml-2 text-xs text-muted-foreground">
+          Step {completedCount + 1}/{totalSteps}
+        </span>
+      )}
     </div>
   );
 }
@@ -60,6 +80,11 @@ function ConferenceResultCard({
   const isExpanded = expandedUrl === result.url;
   const { steps, conference, isRunning, error } = pipelineState;
 
+  const completedSteps = steps.filter(s => s.status === 'complete').length;
+  const currentStep = steps.find(s => s.status === 'start');
+  const currentStepLabel = currentStep ? STEP_LABELS[currentStep.step] || currentStep.step : null;
+  const isDone = conference !== null && !isRunning;
+
   return (
     <div className="border border-border rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 p-3 hover:bg-muted/50 transition-colors">
@@ -74,7 +99,12 @@ function ConferenceResultCard({
           data-testid={`discovery-result-${index}`}
           className="flex-1 text-left min-w-0"
         >
-          <div className="font-medium truncate">{result.title || result.url}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium truncate">{result.title || result.url}</span>
+            {isDone && (
+              <CheckCircle2 className="size-4 text-green-500 shrink-0" />
+            )}
+          </div>
           <div className="text-xs text-muted-foreground truncate">{result.url}</div>
         </button>
         {isRunning ? (
@@ -91,7 +121,16 @@ function ConferenceResultCard({
         <div className="border-t border-border p-3 bg-muted/20">
           {isRunning && (
             <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Pipeline running...</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">
+                  {currentStepLabel || 'Pipeline running...'}
+                </div>
+                {steps.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {completedSteps}/{PIPELINE_STEPS.length} steps
+                  </div>
+                )}
+              </div>
               <StepProgressBar steps={steps} />
             </div>
           )}
@@ -123,33 +162,67 @@ function ConferenceResultCard({
   );
 }
 
-function BatchStatusCard({ batch }: { batch: BatchConference }) {
+function BatchStatusCard({
+  batch,
+  onRetry,
+  showRetry,
+}: {
+  batch: BatchConference;
+  onRetry?: () => void;
+  showRetry?: boolean;
+}) {
+  const completedSteps = batch.steps.filter(s => s.status === 'complete').length;
+  const currentStep = batch.steps.find(s => s.status === 'start');
+  const currentStepLabel = currentStep ? STEP_LABELS[currentStep.step] || currentStep.step : null;
+
   return (
     <div className="border border-border rounded-lg p-3 space-y-2">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm truncate">{batch.title || batch.url}</div>
+          <div className="flex items-center gap-2">
+            <div className="font-medium text-sm truncate">{batch.title || batch.url}</div>
+            {batch.status === 'done' && batch.conference && (
+              <CheckCircle2 className="size-4 text-green-500 shrink-0" />
+            )}
+          </div>
           <div className="text-xs text-muted-foreground truncate">{batch.url}</div>
         </div>
-        <Badge
-          variant={
-            batch.status === 'done' ? 'default' :
-            batch.status === 'error' ? 'destructive' :
-            batch.status === 'running' ? 'secondary' : 'outline'
-          }
-          className="ml-2 shrink-0"
-        >
-          {batch.status === 'pending' && 'Pending'}
-          {batch.status === 'running' && 'Running'}
-          {batch.status === 'done' && 'Done'}
-          {batch.status === 'error' && 'Error'}
-        </Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          {batch.status === 'running' && currentStepLabel && (
+            <span className="text-xs text-muted-foreground">{currentStepLabel}</span>
+          )}
+          <Badge
+            variant={
+              batch.status === 'done' ? 'default' :
+              batch.status === 'error' ? 'destructive' :
+              batch.status === 'running' ? 'secondary' : 'outline'
+            }
+          >
+            {batch.status === 'pending' && 'Pending'}
+            {batch.status === 'running' && 'Running'}
+            {batch.status === 'done' && 'Done'}
+            {batch.status === 'error' && 'Error'}
+          </Badge>
+        </div>
       </div>
       {(batch.status === 'running' || batch.steps.length > 0) && (
-        <StepProgressBar steps={batch.steps} />
+        <div className="space-y-1">
+          <StepProgressBar steps={batch.steps} showLabel />
+        </div>
+      )}
+      {batch.status === 'running' && batch.elapsed > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {batch.elapsed.toFixed(1)}s elapsed
+        </div>
       )}
       {batch.status === 'error' && batch.error && (
         <div className="text-xs text-destructive">Failed: {batch.error}</div>
+      )}
+      {showRetry && batch.status === 'error' && onRetry && (
+        <Button variant="outline" size="sm" onClick={onRetry} className="w-full mt-1">
+          <RotateCcw className="size-3.5 mr-1" />
+          Retry
+        </Button>
       )}
       {batch.conference && (
         <div className="space-y-1 text-xs bg-muted/30 rounded p-2">
@@ -178,7 +251,7 @@ export default function DiscoveryPage() {
   const [topic, setTopic] = useState('medical');
   const [monthsAhead, setMonthsAhead] = useState(3);
   const [numResults, setNumResults] = useState(5);
-  const { results, isRunning: isDiscoveryRunning, error: discoveryError, elapsed, startDiscovery, clearResults } =
+  const { results, isRunning: isDiscoveryRunning, isSearching, foundCount, error: discoveryError, elapsed, startDiscovery, clearResults } =
     useDiscovery();
   const { steps, conference, isRunning: isPipelineRunning, error: pipelineError, startPipeline, cancelPipeline } = usePipeline();
   const { conferences, isRunning: isBatchRunning, totalElapsed, startBatch, cancelBatch, clearResults: clearBatch } = usePipelineBatch();
@@ -186,6 +259,14 @@ export default function DiscoveryPage() {
   const hasRunRef = useRef(false);
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
   const [singleExploreUrl, setSingleExploreUrl] = useState<string | null>(null);
+  const resultsEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll to last result when new ones appear
+  useEffect(() => {
+    if (results.length > 0 && resultsEndRef.current) {
+      resultsEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [results.length]);
 
   // Auto-run on mount using settings defaults
   useEffect(() => {
@@ -222,6 +303,15 @@ export default function DiscoveryPage() {
     startBatch(results.map(r => ({ url: r.url, title: r.title })));
   };
 
+  const handleRetryFailed = () => {
+    const failedUrls = Array.from(conferences.values())
+      .filter(c => c.status === 'error')
+      .map(c => ({ url: c.url, title: c.title }));
+    if (failedUrls.length > 0) {
+      startBatch(failedUrls);
+    }
+  };
+
   const handleCancelBatch = () => {
     cancelBatch();
   };
@@ -242,6 +332,11 @@ export default function DiscoveryPage() {
   const batchSucceeded = Array.from(conferences.values()).filter(c => c.status === 'done' && c.conference).length;
   const batchFailed = Array.from(conferences.values()).filter(c => c.status === 'error').length;
   const batchTotal = conferences.size;
+
+  // Estimate time remaining based on average step time
+  const avgStepTime = totalElapsed / (PIPELINE_STEPS.length * batchTotal || 1);
+  const remainingConferences = Array.from(conferences.values()).filter(c => c.status === 'running' || c.status === 'pending').length;
+  const estimatedRemaining = remainingConferences > 0 ? avgStepTime * PIPELINE_STEPS.length * remainingConferences : 0;
 
   return (
     <div data-testid="discovery-page" className="discovery-page">
@@ -329,10 +424,24 @@ export default function DiscoveryPage() {
         </div>
       )}
 
-      {/* Discovery Status */}
-      {isDiscoveryRunning && (
+      {/* Discovery Status — streaming banner */}
+      {isSearching && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground" data-testid="discovery-loading">
+          <Loader2 className="size-4 animate-spin shrink-0" />
+          <span>
+            Searching Exa + filtering...
+            <span className="ml-1 font-medium text-foreground animate-pulse">
+              {foundCount} found
+            </span>
+            {' '}so far ({elapsed.toFixed(1)}s)
+          </span>
+        </div>
+      )}
+
+      {/* Discovery done — static summary */}
+      {!isSearching && isDiscoveryRunning && (
         <div className="mb-4 text-sm text-muted-foreground" data-testid="discovery-loading">
-          Searching Exa and filtering results... ({elapsed.toFixed(1)}s)
+          Processing results... ({elapsed.toFixed(1)}s)
         </div>
       )}
 
@@ -350,7 +459,7 @@ export default function DiscoveryPage() {
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {Array.from(conferences.values()).map(conf => (
-              <BatchStatusCard key={conf.url} batch={conf} />
+              <BatchStatusCard key={conf.url} batch={conf} showRetry={false} />
             ))}
           </div>
         </div>
@@ -360,19 +469,29 @@ export default function DiscoveryPage() {
       {!isBatchRunning && hasBatchResults && (
         <div className="mb-4 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">
-              Batch Complete
-              <span className="ml-2 text-muted-foreground font-normal">
-                ({batchSucceeded} succeeded, {batchFailed} failed out of {batchTotal})
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Batch Complete</span>
+              <span className="text-sm text-muted-foreground">
+                ({batchSucceeded} succeeded
+                {batchFailed > 0 && <span className="text-destructive">, {batchFailed} failed</span>}
+                {' '}out of {batchTotal})
               </span>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleClearBatch}>
-              Clear
-            </Button>
+            <div className="flex items-center gap-1">
+              {batchFailed > 0 && (
+                <Button variant="outline" size="sm" onClick={handleRetryFailed}>
+                  <RotateCcw className="size-3.5 mr-1" />
+                  Retry ({batchFailed})
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleClearBatch}>
+                Clear
+              </Button>
+            </div>
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {Array.from(conferences.values()).map(conf => (
-              <BatchStatusCard key={conf.url} batch={conf} />
+              <BatchStatusCard key={conf.url} batch={conf} showRetry={batchFailed > 0} onRetry={handleRetryFailed} />
             ))}
           </div>
         </div>
@@ -383,7 +502,20 @@ export default function DiscoveryPage() {
         <div data-testid="discovery-results">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted-foreground">
-              Found {results.length} conference{results.length !== 1 ? 's' : ''} in {elapsed.toFixed(1)}s
+              {isSearching ? (
+                <>
+                  <span className="animate-pulse font-medium text-foreground">
+                    {foundCount}
+                  </span>
+                  {' '}found so far
+                  {results.length > 0 && ` — ${results.length} shown`}
+                  {' '}({elapsed.toFixed(1)}s)
+                </>
+              ) : (
+                <>
+                  Found {results.length} conference{results.length !== 1 ? 's' : ''} in {elapsed.toFixed(1)}s
+                </>
+              )}
             </p>
             {!isBatchRunning && (
               <Button
@@ -415,6 +547,8 @@ export default function DiscoveryPage() {
                 />
               </li>
             ))}
+            {/* Invisible anchor for auto-scroll to last result */}
+            <div ref={resultsEndRef} />
           </ul>
         </div>
       )}

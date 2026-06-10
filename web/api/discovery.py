@@ -1,7 +1,10 @@
 """Discovery endpoint - searches for conferences via Exa + LLM filter.
 
-POST /api/discovery/search - accepts topic/months_ahead, returns
-SSE stream of discovery progress + final result list.
+POST /api/discovery/search - accepts topic/months_ahead, streams:
+  - search_start:       discovery search has begun
+  - result_found:       one conference passed the LLM relevance filter
+  - search_complete:    all Exa queries done, filtering done, results finalised
+  - done:               SSE stream ended
 """
 
 import asyncio
@@ -27,15 +30,23 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# ── New event types ──────────────────────────────────────────────────────
+SEARCH_START = "search_start"
+RESULT_FOUND = "result_found"
+SEARCH_COMPLETE = "search_complete"
+
 
 @router.post("/search")
 async def search_discovery(body: dict):
-    """Run discovery search and stream results via SSE.
+    """Run discovery search and stream results as they're found.
 
     Body (all optional, defaults from settings):
         topic: str = "medical"
         months_ahead: int = 3
         num_results: int = 5
+
+    Streams one 'result_found' event per accepted conference,
+    followed by a single 'search_complete' with the final summary.
     """
     topic = body.get("topic", settings.discovery.topic)
     months_ahead = body.get("months_ahead", settings.discovery.months_ahead)
@@ -43,38 +54,47 @@ async def search_discovery(body: dict):
 
     async def event_generator():
         t0 = asyncio.get_event_loop().time()
+
+        # Signal search has started
         yield {
-            "event": STEP_COMPLETE,
+            "event": SEARCH_START,
             "data": json.dumps({
-                "step": "search_exa",
-                "label": "Searching Exa...",
+                "topic": topic,
+                "months_ahead": months_ahead,
                 "elapsed": 0.0,
             }),
         }
+
         try:
-            # Run sync discovery in thread pool to avoid blocking event loop
             loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: run_discovery(topic, months_ahead, num_results)
-            )
+            found_count = 0
+
+            # Consume the generator incrementally — yield each result as found
+            for result in run_discovery(topic, months_ahead, num_results):
+                found_count += 1
+                elapsed = asyncio.get_event_loop().time() - t0
+                item = DiscoveryResultItem(
+                    url=result["url"],
+                    title=result.get("title", ""),
+                )
+                yield {
+                    "event": RESULT_FOUND,
+                    "data": json.dumps({
+                        "item": item.model_dump(),
+                        "count": found_count,
+                        "elapsed": round(elapsed, 1),
+                    }),
+                }
+
             elapsed = asyncio.get_event_loop().time() - t0
-            items = [
-                DiscoveryResultItem(url=r["url"], title=r.get("title", ""))
-                for r in results
-            ]
             yield {
-                "event": PIPELINE_COMPLETE,
+                "event": SEARCH_COMPLETE,
                 "data": json.dumps({
-                    **DiscoveryComplete(
-                        results=items,
-                        total_elapsed=round(elapsed, 1),
-                        steps_completed=1,
-                        total_found=len(results),
-                        accepted=len(results),
-                    ).model_dump(),
+                    "total_found": found_count,
+                    "elapsed": round(elapsed, 1),
                 }),
             }
+
         except Exception as exc:
             logger.exception("Discovery error: %s", exc)
             yield {
@@ -86,6 +106,7 @@ async def search_discovery(body: dict):
                     "elapsed": asyncio.get_event_loop().time() - t0,
                 }),
             }
+
         yield {"event": DONE, "data": json.dumps({})}
 
     return EventSourceResponse(event_generator(), ping=15)

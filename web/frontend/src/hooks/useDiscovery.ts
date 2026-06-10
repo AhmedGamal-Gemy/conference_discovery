@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { DiscoveryEvent, DiscoveryCompleteData } from '../types/pipeline';
 
 interface UseDiscoveryReturn {
   results: Array<{ url: string; title: string }>;
   isRunning: boolean;
+  isSearching: boolean;   // true while Exa is still querying + filtering
+  foundCount: number;     // live count as results trickle in
   error: string | null;
   elapsed: number;
   startDiscovery: (topic: string, monthsAhead: number, numResults: number) => void;
@@ -13,6 +14,8 @@ interface UseDiscoveryReturn {
 export function useDiscovery(): UseDiscoveryReturn {
   const [results, setResults] = useState<Array<{ url: string; title: string }>>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [foundCount, setFoundCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
@@ -28,6 +31,8 @@ export function useDiscovery(): UseDiscoveryReturn {
       setResults([]);
       setError(null);
       setElapsed(0);
+      setFoundCount(0);
+      setIsSearching(false);
       setIsRunning(true);
 
       const controller = new AbortController();
@@ -71,18 +76,40 @@ export function useDiscovery(): UseDiscoveryReturn {
                   if (!eventType || !rawData) continue;
 
                   switch (eventType) {
-                    case 'step_complete': {
+                    case 'search_start': {
+                      setIsSearching(true);
                       const d = JSON.parse(rawData);
                       if (d.elapsed) setElapsed(d.elapsed);
                       break;
                     }
-                    case 'pipeline_complete': {
-                      const d = JSON.parse(rawData) as DiscoveryCompleteData;
-                      setResults(d.results || []);
+
+                    case 'result_found': {
+                      const d = JSON.parse(rawData);
+                      setFoundCount(d.count);
+                      setElapsed(d.elapsed);
+                      if (d.item) {
+                        setResults(prev => [...prev, d.item]);
+                      }
+                      break;
+                    }
+
+                    case 'search_complete': {
+                      setIsSearching(false);
+                      const d = JSON.parse(rawData);
                       setElapsed(d.total_elapsed);
                       setIsRunning(false);
                       break;
                     }
+
+                    case 'step_complete': {
+                      const d = JSON.parse(rawData);
+                      if (d.elapsed) setElapsed(d.elapsed);
+                      if (d.step === 'error') {
+                        setError(d.error);
+                      }
+                      break;
+                    }
+
                     case 'done':
                       setIsRunning(false);
                       break;
@@ -110,7 +137,17 @@ export function useDiscovery(): UseDiscoveryReturn {
     setResults([]);
     setError(null);
     setElapsed(0);
+    setFoundCount(0);
   }, []);
 
-  return { results, isRunning, error, elapsed, startDiscovery, clearResults };
+  return {
+    results,
+    isRunning,
+    isSearching,
+    foundCount,
+    error,
+    elapsed,
+    startDiscovery,
+    clearResults,
+  };
 }
