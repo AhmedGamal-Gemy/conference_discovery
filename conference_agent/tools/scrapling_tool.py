@@ -12,7 +12,7 @@ scrapling_toolset = McpToolset(
             "Accept": "application/json, text/event-stream",
         },
         timeout=30.0,
-        sse_read_timeout=300.0,
+        sse_read_timeout=600.0,
     ),
 )
 

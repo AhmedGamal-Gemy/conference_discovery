@@ -11,14 +11,30 @@ interface UseDiscoveryReturn {
   clearResults: () => void;
 }
 
+const STORAGE_KEY = 'discovery_results';
+
+function loadStoredResults(): Array<{ url: string; title: string }> {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function useDiscovery(): UseDiscoveryReturn {
-  const [results, setResults] = useState<Array<{ url: string; title: string }>>([]);
+  const [results, setResults] = useState<Array<{ url: string; title: string }>>(() => loadStoredResults());
   const [isRunning, setIsRunning] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [foundCount, setFoundCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
+
+  // Persist results to sessionStorage whenever they change
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+  }, [results]);
 
   useEffect(() => {
     return () => {
@@ -28,6 +44,7 @@ export function useDiscovery(): UseDiscoveryReturn {
 
   const startDiscovery = useCallback(
     (topic: string, monthsAhead: number, numResults: number) => {
+      sessionStorage.removeItem(STORAGE_KEY);
       setResults([]);
       setError(null);
       setElapsed(0);
@@ -79,14 +96,14 @@ export function useDiscovery(): UseDiscoveryReturn {
                     case 'search_start': {
                       setIsSearching(true);
                       const d = JSON.parse(rawData);
-                      if (d.elapsed) setElapsed(d.elapsed);
+                      setElapsed(d.elapsed ?? 0);
                       break;
                     }
 
                     case 'result_found': {
                       const d = JSON.parse(rawData);
                       setFoundCount(d.count);
-                      setElapsed(d.elapsed);
+                      setElapsed(d.elapsed ?? 0);
                       if (d.item) {
                         setResults(prev => [...prev, d.item]);
                       }
@@ -96,14 +113,14 @@ export function useDiscovery(): UseDiscoveryReturn {
                     case 'search_complete': {
                       setIsSearching(false);
                       const d = JSON.parse(rawData);
-                      setElapsed(d.total_elapsed);
+                      setElapsed(d.total_elapsed ?? 0);
                       setIsRunning(false);
                       break;
                     }
 
                     case 'step_complete': {
                       const d = JSON.parse(rawData);
-                      if (d.elapsed) setElapsed(d.elapsed);
+                      setElapsed(d.elapsed ?? 0);
                       if (d.step === 'error') {
                         setError(d.error);
                       }
@@ -134,6 +151,7 @@ export function useDiscovery(): UseDiscoveryReturn {
   );
 
   const clearResults = useCallback(() => {
+    sessionStorage.removeItem(STORAGE_KEY);
     setResults([]);
     setError(null);
     setElapsed(0);

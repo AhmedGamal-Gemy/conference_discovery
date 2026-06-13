@@ -1,31 +1,33 @@
 model_list:
+  # Primary — Cerebras (fast, 5 RPM, 1M tokens/day, no card)
+  - model_name: cerebras-small
+    litellm_params:
+      model: cerebras/gpt-oss-120b
+      api_key: os.environ/CEREBRAS_API_KEY
+    rpm: 5
+    tpm: 30000
+    timeout: 60
+    num_retries: 3
+
+  # Fallback — Mistral
   - model_name: mistral-small
     litellm_params:
       model: mistral/mistral-small-latest
       api_key: os.environ/MISTRAL_API_KEY
-      rpm: 10
-      tpm: 1000
-      timeout: 120
-      num_retries: 20
-  
-  - model_name: mistral-large
-    litellm_params:
-      model: mistral/mistral-large-latest
-      api_key: os.environ/MISTRAL_API_KEY
-      rpm: 10
-      tpm: 500
-      timeout: 120
-      num_retries: 20
+    rpm: 2
+    tpm: 500000
+    timeout: 60
+    num_retries: 3
 
 general_settings:
   master_key: sk-1234
   database_url: postgresql://litellm:litellm@db:5432/litellm
-  
+
 router_settings:
   redis_host: ""
   routing_strategy: simple-shuffle
-  num_retries: 20
-  timeout: 300
-  retry_after: 5
-  allowed_fails: 100
-  cooldown_time: 60
+  num_retries: 3
+  timeout: 90
+  retry_after: 2
+  allowed_fails: 5
+  cooldown_time: 20

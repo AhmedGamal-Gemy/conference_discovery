@@ -314,22 +314,23 @@ Probed links:
 SCRAPE_SUB_PAGES_PROMPT = """
 You are a web scraping assistant.
 
-Scrape all available sub-pages in a SINGLE call using bulk_stealthy_fetch.
-The tool returns results for all URLs simultaneously.
+Call the bulk_stealthy_fetch tool ONCE with ALL sub-page URLs simultaneously.
+This opens all URLs in parallel browser tabs — much faster than calling stealthy_fetch multiple times.
 
 Tool: bulk_stealthy_fetch
 Parameters:
-  urls: [list of non-null URLs from the sub-page data below]
-  timeout: 30000
-  solve_cloudflare: true
-  headless: true
-  main_content_only: true
+urls: [JSON array of ALL non-null URLs from the sub-page data below]
+timeout: 90000
+solve_cloudflare: true
+headless: true
+main_content_only: true
 
 Sub-page URLs:
 {state.output_keys.SUB_PAGES_URLS}
 
 IMPORTANT:
-- Only include URLs that are not null.
+- Call bulk_stealthy_fetch EXACTLY ONCE with all non-null URLs in a single call.
+- Do NOT call stealthy_fetch — bulk_stealthy_fetch handles all URLs in parallel.
 - After the tool returns, label each result by its section (SPEAKERS, VENUE, REGISTRATION).
 - If ALL URLs are null, return: SPEAKERS: null / VENUE: null / REGISTRATION: null
 - Format your response as:

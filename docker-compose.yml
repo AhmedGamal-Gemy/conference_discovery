@@ -42,62 +42,30 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── Application ───────────────────────────────────────────────────
-  backend:
-    image: python:3.12-slim
-    working_dir: /app
-    volumes:
-      - .:/app
-    env_file:
-      - conference_agent/.env
-    environment:
-      - BACKEND_HOST=0.0.0.0
-      - BACKEND_PORT=${BACKEND_PORT:-8001}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
-      - LITELLM_PROXY_API_BASE=http://litellm-proxy:${LITELLM_PROXY_PORT:-4000}
-      - SCRAPLING_MCP_URL=http://scrapling-mcp:${SCRAPLING_MCP_PORT:-8017}/mcp
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-litellm}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_USER=${POSTGRES_USER:-litellm}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-litellm}
-      - POSTGRES_DB=${POSTGRES_DB:-litellm}
-    ports:
-      - "${BACKEND_PORT:-8001}:${BACKEND_PORT:-8001}"
-    command: >
-      bash -c "
-        pip install uv &&
-        uv pip install --system -e .[extensions] &&
-        uv run uvicorn web.app:app --host 0.0.0.0 --port ${BACKEND_PORT:-8001}
-      "
-    depends_on:
-      litellm-proxy:
-        condition: service_started
-      scrapling-mcp:
-        condition: service_started
-    restart: unless-stopped
-
-  frontend:
-    image: node:24-alpine
-    working_dir: /app
-    volumes:
-      - ./web/frontend:/app
-      - /app/node_modules
-    environment:
-      - VITE_API_PROXY_TARGET=http://backend:${BACKEND_PORT:-8001}
-      - VITE_HOST=0.0.0.0
-      - VITE_PORT=${FRONTEND_PORT:-5173}
-    ports:
-      - "${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}"
-    command: >
-      bash -c "
-        npm install &&
-        npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT:-5173}
-      "
-    depends_on:
-      backend:
-        condition: service_started
-    restart: unless-stopped
+  # ── Application (run manually) ─────────────────────────────────────
+  # Backend:  uv run uvicorn web.app:app --reload --port 8001
+  # Frontend: cd web/frontend && npm run dev
+  #
+  # backend:
+  #   build: .
+  #   env_file: [conference_agent/.env]
+  #   environment:
+  #     BACKEND_HOST: 0.0.0.0
+  #     BACKEND_PORT: 8001
+  #     CORS_ORIGINS: http://localhost:5173
+  #     LITELLM_PROXY_API_BASE: http://localhost:4000
+  #     SCRAPLING_MCP_URL: http://localhost:8017/mcp
+  #   ports: ["8001:8001"]
+  #   depends_on: [litellm-proxy, scrapling-mcp]
+  #
+  # frontend:
+  #   build: ./web/frontend
+  #   environment:
+  #     VITE_API_PROXY_TARGET: http://localhost:8001
+  #     VITE_HOST: 0.0.0.0
+  #     VITE_PORT: 5173
+  #   ports: ["5173:5173"]
+  #   depends_on: [backend]
 
 volumes:
   postgres_data:

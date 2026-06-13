@@ -1,10 +1,57 @@
 """Shared after-model callbacks used by multiple step agents."""
 
-import re
 import json
+import re
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 from google.adk.models.llm_response import LlmResponse
+from google.adk.models.llm_request import LlmRequest
+
+from conference_agent.config import settings
+
+
+def strip_reasoning_content_before_model(
+    callback_context: Any, llm_request: LlmRequest
+) -> Optional[LlmResponse]:
+    """Before-model callback: rename reasoning_content → reasoning for Cerebras.
+
+    Cerebras API rejects reasoning_content in INPUT messages but returns it in
+    OUTPUT. ADK stores it in session history, so subsequent calls fail with:
+    'messages.N.assistant.reasoning_content: property is unsupported'
+
+    This renames reasoning_content → reasoning only when Cerebras is used.
+    Only affects assistant role messages.
+    """
+    # Only strip when using Cerebras (check settings, not llm_request.model)
+    if "cerebras" not in settings.llm.extraction.model.lower():
+        return None
+
+    if llm_request.contents:
+        for content in llm_request.contents:
+            if content.role == "assistant":
+                _strip_reasoning_content(content)
+    return None
+
+
+def _strip_reasoning_content(content: Any) -> None:
+    """Remove reasoning_content from a Content object, rename to reasoning if needed."""
+    # Handle __dict__ (Pydantic extra fields, direct attributes)
+    if hasattr(content, "__dict__"):
+        d = content.__dict__
+        if "reasoning_content" in d:
+            val = d.pop("reasoning_content")
+            if "reasoning" not in d:
+                d["reasoning"] = val
+    # Also handle parts
+    if hasattr(content, "parts") and content.parts:
+        for part in content.parts:
+            if hasattr(part, "__dict__"):
+                pd = part.__dict__
+                if "reasoning_content" in pd:
+                    val = pd.pop("reasoning_content")
+                    if "reasoning" not in pd:
+                        pd["reasoning"] = val
 
 
 def strip_markdown_codeblock(*args, **kwargs):

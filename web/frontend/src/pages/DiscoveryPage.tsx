@@ -138,19 +138,48 @@ function ConferenceResultCard({
             <div className="text-xs text-destructive">Error: {error}</div>
           )}
           {conference && (
-            <div className="space-y-1 text-xs">
-              <div className="font-medium">{conference.conference_name}</div>
-              <div className="text-muted-foreground">
-                {conference.date_start && conference.date_end
-                  ? `${conference.date_start} – ${conference.date_end}`
-                  : 'Dates TBD'}
-              </div>
-              <div className="text-muted-foreground">
-                {conference.venue_city ? `${conference.venue_city}, ${conference.venue_country || ''}` : 'Venue TBD'}
-              </div>
-              <div className="text-muted-foreground">
-                {conference.total_speakers} speaker{conference.total_speakers !== 1 ? 's' : ''} confirmed
-              </div>
+            <div className="space-y-4 border-t border-border pt-3 mt-3">
+              <div className="text-lg font-bold">{conference.conference_name}</div>
+              {conference.date_start && conference.date_end && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Dates: </span>
+                  <span>{conference.date_start} – {conference.date_end}</span>
+                </div>
+              )}
+              {(conference.venue_city || conference.venue_country) && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Venue: </span>
+                  <span>{[conference.venue_city, conference.venue_country].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {conference.total_speakers > 0 && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Speakers: </span>
+                  <span>{conference.total_speakers} confirmed{conference.speakers?.length > 0 ? ` — ${conference.speakers.slice(0, 5).map((s: any) => s.name).join(', ')}${conference.speakers.length > 5 ? '...' : ''}` : ''}</span>
+                </div>
+              )}
+              {conference.sector_tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {conference.sector_tags.map((tag: string, i: number) => (
+                    <span key={i} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{tag}</span>
+                  ))}
+                </div>
+              )}
+              {(conference.fee_range_usd || conference.early_bird_deadline) && (
+                <div className="text-sm space-y-0.5">
+                  {conference.fee_range_usd && (
+                    <div><span className="text-muted-foreground">Fee: </span><span>{conference.fee_range_usd}</span></div>
+                  )}
+                  {conference.early_bird_deadline && (
+                    <div><span className="text-muted-foreground">Early bird: </span><span>{conference.early_bird_deadline}</span></div>
+                  )}
+                </div>
+              )}
+              {conference.website_url && (
+                <a href={conference.website_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:underline break-all">
+                  {conference.website_url}
+                </a>
+              )}
             </div>
           )}
           {!isRunning && !error && !conference && (
@@ -225,19 +254,48 @@ function BatchStatusCard({
         </Button>
       )}
       {batch.conference && (
-        <div className="space-y-1 text-xs bg-muted/30 rounded p-2">
-          <div className="font-medium">{batch.conference.conference_name}</div>
-          <div className="text-muted-foreground">
-            {batch.conference.date_start && batch.conference.date_end
-              ? `${batch.conference.date_start} – ${batch.conference.date_end}`
-              : 'Dates TBD'}
-          </div>
-          <div className="text-muted-foreground">
-            {batch.conference.venue_city ? `${batch.conference.venue_city}, ${batch.conference.venue_country || ''}` : 'Venue TBD'}
-          </div>
-          <div className="text-muted-foreground">
-            {batch.conference.total_speakers} speaker{batch.conference.total_speakers !== 1 ? 's' : ''} confirmed
-          </div>
+        <div className="space-y-3 bg-muted/30 rounded-lg p-4 mt-2">
+          <div className="text-base font-bold leading-tight">{batch.conference.conference_name}</div>
+          {batch.conference.date_start && batch.conference.date_end && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Dates: </span>
+              <span>{batch.conference.date_start} – {batch.conference.date_end}</span>
+            </div>
+          )}
+          {(batch.conference.venue_city || batch.conference.venue_country) && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Venue: </span>
+              <span>{[batch.conference.venue_city, batch.conference.venue_country].filter(Boolean).join(', ')}</span>
+            </div>
+          )}
+          {batch.conference.total_speakers > 0 && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Speakers: </span>
+              <span>{batch.conference.total_speakers} confirmed{batch.conference.speakers?.length > 0 ? ` — ${batch.conference.speakers.slice(0, 5).map((s: any) => s.name).join(', ')}${batch.conference.speakers.length > 5 ? '...' : ''}` : ''}</span>
+            </div>
+          )}
+          {batch.conference.sector_tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {batch.conference.sector_tags.map((tag: string, i: number) => (
+                <span key={i} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{tag}</span>
+              ))}
+            </div>
+          )}
+          {(batch.conference.fee_range_usd || batch.conference.early_bird_deadline) && (
+            <div className="text-sm space-y-0.5">
+              {batch.conference.fee_range_usd && (
+                <div><span className="text-muted-foreground">Fee: </span><span>{batch.conference.fee_range_usd}</span></div>
+              )}
+              {batch.conference.early_bird_deadline && (
+                <div><span className="text-muted-foreground">Early bird: </span><span>{batch.conference.early_bird_deadline}</span></div>
+              )}
+            </div>
+          )}
+          {batch.conference.website_url && (
+            <a href={batch.conference.website_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:underline break-all">
+              {batch.conference.website_url}
+            </a>
+          )}
         </div>
       )}
       {batch.status === 'done' && !batch.conference && (
@@ -268,11 +326,15 @@ export default function DiscoveryPage() {
     }
   }, [results.length]);
 
-  // Auto-run on mount using settings defaults
+  // Auto-run on mount only if no stored results exist
   useEffect(() => {
     if (!hasRunRef.current) {
       hasRunRef.current = true;
-      startDiscovery(topic, monthsAhead, numResults);
+      // Only auto-run if sessionStorage is empty (user returning to page keeps their results)
+      const stored = sessionStorage.getItem('discovery_results');
+      if (!stored || JSON.parse(stored).length === 0) {
+        startDiscovery(topic, monthsAhead, numResults);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

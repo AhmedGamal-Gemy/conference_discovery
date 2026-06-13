@@ -28,19 +28,19 @@ output:
 
 llm:
   orchestrator:
-    model: "mistral-small"
+    model: "cerebras-small"
     temperature: 0.2
   discovery:
-    model: "mistral-small"
+    model: "cerebras-small"
     temperature: 0.2
   extraction:
-    model: "mistral-small"
+    model: "cerebras-small"
     temperature: 0.1
   validation:
-    model: "mistral-small"
+    model: "cerebras-small"
     temperature: 0.1
   relevance_filter:
-    model: "mistral-small"
+    model: "cerebras-small"
     temperature: 0.0
 
 scrapling_mcp_url: "http://localhost:8017/mcp"

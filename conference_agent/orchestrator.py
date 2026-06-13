@@ -18,9 +18,6 @@ configured in config.py. The proxy handles rate limiting internally
 
 from google.adk import Workflow
 
-from conference_agent.config import settings
-
-from conference_agent.steps.step0_discover_conferences import discover_conferences_agent
 from conference_agent.steps.step1_scrape_homepage import scrape_homepage_agent
 from conference_agent.steps.step2_extract_homepage import extract_homepage_agent
 from conference_agent.steps.step2_5_discover_links import discover_links_agent
@@ -32,11 +29,10 @@ from conference_agent.steps.step6_assemble_conference import assemble_conference
 
 pipeline_orchestrator = Workflow(
     name="pipeline_orchestrator",
-    description="Full conference pipeline: discover → scrape → extract → discover_links → probe → merge → scrape_sub_pages → extract_sub_pages → assemble",
+    description="Full conference pipeline: scrape → extract → discover_links → probe → merge → scrape_sub_pages → extract_sub_pages → assemble",
     edges=[
         (
             "START",
-            discover_conferences_agent,
             scrape_homepage_agent,
             extract_homepage_agent,
             discover_links_agent,

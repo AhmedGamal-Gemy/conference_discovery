@@ -30,7 +30,7 @@ def discover_conferences(
     topic = topic or settings.discovery.topic
     months_ahead = months_ahead or settings.discovery.months_ahead
     num_results = num_results or settings.exa.num_results
-    return run_discovery(topic, months_ahead, num_results)
+    return list(run_discovery(topic, months_ahead, num_results))
 
 
 discover_conferences_tool = FunctionTool(func=discover_conferences)

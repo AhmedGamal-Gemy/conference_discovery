@@ -32,11 +32,37 @@ interface UsePipelineBatchReturn {
   clearResults: () => void;
 }
 
+const STORAGE_KEY = 'discovery_batch';
+const RUNNING_KEY = 'discovery_batch_running';
+
+function loadStoredBatch(): Map<string, BatchConference> {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored) return new Map(JSON.parse(stored));
+  } catch { /* ignore */ }
+  return new Map();
+}
+
+function loadStoredRunning(): boolean {
+  try {
+    return sessionStorage.getItem(RUNNING_KEY) === 'true';
+  } catch { return false; }
+}
+
 export function usePipelineBatch(): UsePipelineBatchReturn {
-  const [conferences, setConferences] = useState<Map<string, BatchConference>>(new Map());
-  const [isRunning, setIsRunning] = useState(false);
+  const [conferences, setConferences] = useState<Map<string, BatchConference>>(() => loadStoredBatch());
+  const [isRunning, setIsRunning] = useState(() => loadStoredRunning());
   const [totalElapsed, setTotalElapsed] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
+
+  // Persist to sessionStorage on change
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...conferences.entries()]));
+  }, [conferences]);
+
+  useEffect(() => {
+    sessionStorage.setItem(RUNNING_KEY, String(isRunning));
+  }, [isRunning]);
 
   useEffect(() => {
     return () => {
@@ -45,6 +71,7 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
   }, []);
 
   const startBatch = useCallback((urls: Array<{ url: string; title?: string }>) => {
+    sessionStorage.removeItem(STORAGE_KEY);
     setConferences(new Map());
     setTotalElapsed(0);
     setIsRunning(true);
@@ -108,19 +135,13 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
                   const next = new Map(prev);
 
                   switch (eventType) {
-                    case 'batch_started': {
-                      const d = JSON.parse(rawData) as BatchStartedData;
-                      setTotalElapsed(d.elapsed);
-                      break;
-                    }
-
                     case 'conference_start': {
                       const d = JSON.parse(rawData) as ConferenceStartData;
                       const existing = next.get(d.url);
                       if (existing) {
-                        next.set(d.url, { ...existing, status: 'running', elapsed: d.elapsed });
+                        next.set(d.url, { ...existing, status: 'running', elapsed: d.elapsed ?? 0 });
                       }
-                      setTotalElapsed(d.elapsed);
+                      setTotalElapsed(d.elapsed ?? 0);
                       break;
                     }
 
@@ -128,8 +149,8 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
                       const d = JSON.parse(rawData) as StepStartData;
                       const conf = next.get(d.url);
                       if (conf) {
-                        const steps = [...conf.steps, { ...d, status: 'start' as const, error: null }];
-                        next.set(d.url, { ...conf, steps, elapsed: d.elapsed });
+                        const steps = [...conf.steps, { ...d, status: 'start' as const, error: null, elapsed: d.elapsed ?? 0 }];
+                        next.set(d.url, { ...conf, steps, elapsed: d.elapsed ?? 0 });
                       }
                       break;
                     }
@@ -141,7 +162,7 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
                         const steps = conf.steps.map(s =>
                           s.step === d.step ? { ...s, ...d, status: 'complete' as const } : s
                         );
-                        next.set(d.url, { ...conf, steps, elapsed: d.elapsed });
+                        next.set(d.url, { ...conf, steps, elapsed: d.elapsed ?? 0 });
                       }
                       break;
                     }
@@ -153,7 +174,7 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
                         const steps = conf.steps.map(s =>
                           s.step === d.step ? { ...s, ...d, status: 'error' as const, error: d.error } : s
                         );
-                        next.set(d.url, { ...conf, steps, error: d.error, elapsed: d.elapsed });
+                        next.set(d.url, { ...conf, steps, error: d.error, elapsed: d.elapsed ?? 0 });
                       }
                       break;
                     }
@@ -166,7 +187,7 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
                           ...conf,
                           status: 'done',
                           conference: d.conference as Conference | null,
-                          elapsed: d.elapsed,
+                          elapsed: d.elapsed ?? 0,
                           error: null,
                         });
                       }
@@ -181,15 +202,21 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
                           ...conf,
                           status: 'error',
                           error: d.error,
-                          elapsed: d.elapsed,
+                          elapsed: d.elapsed ?? 0,
                         });
                       }
                       break;
                     }
 
+                    case 'batch_started': {
+                      const d = JSON.parse(rawData) as BatchStartedData;
+                      setTotalElapsed(d.elapsed ?? 0);
+                      break;
+                    }
+
                     case 'batch_complete': {
                       const d = JSON.parse(rawData) as BatchCompleteData;
-                      setTotalElapsed(d.elapsed);
+                      setTotalElapsed(d.elapsed ?? 0);
                       break;
                     }
                   }
@@ -223,8 +250,11 @@ export function usePipelineBatch(): UsePipelineBatchReturn {
   }, []);
 
   const clearResults = useCallback(() => {
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(RUNNING_KEY);
     setConferences(new Map());
     setTotalElapsed(0);
+    setIsRunning(false);
   }, []);
 
   return { conferences, isRunning, totalElapsed, startBatch, cancelBatch, clearResults };
