@@ -112,6 +112,8 @@ _os.environ["LITELLM_PROXY_API_KEY"] = _litellm_proxy_key
 _os.environ.setdefault("LITELLM_PROXY_API_BASE", "http://localhost:4000")
 litellm.use_litellm_proxy = True  # Routes all LLM calls through the proxy
 
+
+
 # Run the code
 if __name__ == "__main__":
     # You don't need to pass the dict manually anymore!
