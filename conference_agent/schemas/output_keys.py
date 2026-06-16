@@ -13,4 +13,5 @@ class output_keys(StrEnum):
     VENUE_DATA = auto()
     REGISTRATION_DATA = auto()
     SUB_PAGES_DATA = auto()
+    VALIDATION_DATA = auto()
 
