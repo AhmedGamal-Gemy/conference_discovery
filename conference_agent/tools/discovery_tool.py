@@ -6,7 +6,7 @@ Flow:
 1. Generate time-bounded search queries (topic + upcoming months)
 2. Search Exa for each query
 3. Deduplicate results by URL
-4. LLM relevance filter on each unique result (sync litellm.completion)
+4. Single batch LLM relevance filter on all unique results
 5. Yield {url, title} per accepted conference (incremental)
 """
 
@@ -15,7 +15,7 @@ import logging
 from conference_agent.config import settings
 from conference_agent.tools.exa_tool import search_conferences
 from conference_agent.tools.query_generator import generate_queries
-from conference_agent.tools.relevance_filter import is_relevant_conference
+from conference_agent.tools.relevance_filter import batch_filter_conferences
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +59,13 @@ def run_discovery(
     deduped = list(seen.values())
     logger.info("Discovery after dedup: %d", len(deduped))
 
-    for r in deduped:
-        try:
-            relevant = is_relevant_conference(
-                topic=topic,
-                title=r.get("title", ""),
-                snippet=r.get("snippet", ""),
-                url=r.get("url", ""),
-            )
-            if relevant:
-                logger.debug("Discovery accepted: %s", r.get("url"))
-                yield {"url": r["url"], "title": r.get("title", ""), "raw": r}
-        except Exception as exc:
-            logger.warning("Relevance filter error for %r: %s", r.get("url"), exc)
+    # Single batch LLM call instead of one per result
+    try:
+        accepted = batch_filter_conferences(topic=topic, results=deduped)
+        for r in accepted:
+            logger.debug("Discovery accepted: %s", r.get("url"))
+            yield {"url": r["url"], "title": r.get("title", ""), "raw": r}
+    except Exception as exc:
+        logger.warning("Batch relevance filter error: %s", exc)
 
     logger.info("Discovery complete")
