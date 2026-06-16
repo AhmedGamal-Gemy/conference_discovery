@@ -392,6 +392,9 @@ Assemble them into this exact JSON structure:
     "total_speakers": "length of speakers list",
     "non_local_count": "count of speakers where is_local is false or null, 0 if empty list",
     "non_usa_count": "count of speakers where is_usa is false or null, 0 if empty list",
+    "sector_tags": "copy from HOMEPAGE_DATA.sector_tags (list of topic tags, empty list if none)",
+    "fee_range_usd": "from SUB_PAGES_DATA.registration.fee_range_usd or null",
+    "early_bird_deadline": "from SUB_PAGES_DATA.registration.early_bird_deadline or null",
     "website_url": "the original conference URL from the system state",
     "speakers_page_url": "from SUB_PAGES_URLS.speakers or null"
 }

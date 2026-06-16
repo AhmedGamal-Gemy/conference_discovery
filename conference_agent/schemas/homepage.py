@@ -9,7 +9,7 @@ class SubPages(BaseModel):
 
 
 class HomepageData(BaseModel):
-    conference_name: str
+    conference_name: Optional[str] = None
     conference_acronym: Optional[str] = None
     date_start: Optional[str] = None
     date_end: Optional[str] = None
