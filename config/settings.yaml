@@ -28,19 +28,19 @@ output:
 
 llm:
   orchestrator:
-    model: "cerebras-small"
+    model: "freetheai-fast"
     temperature: 0.2
   discovery:
-    model: "cerebras-small"
+    model: "freetheai-fast"
     temperature: 0.2
   extraction:
-    model: "cerebras-small"
+    model: "freetheai-smart"
     temperature: 0.1
   validation:
-    model: "cerebras-small"
+    model: "freetheai-fast"
     temperature: 0.1
   relevance_filter:
-    model: "cerebras-small"
+    model: "freetheai-fast"
     temperature: 0.0
 
 scrapling_mcp_url: "http://localhost:8017/mcp"

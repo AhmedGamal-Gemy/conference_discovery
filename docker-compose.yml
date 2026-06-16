@@ -30,6 +30,7 @@ services:
       - "${LITELLM_PROXY_PORT:-4000}:4000"
     volumes:
       - ./proxy_config.yaml:/app/proxy_config.yaml
+      - ./proxy_callbacks.py:/app/proxy_callbacks.py
     env_file:
       - conference_agent/.env
     environment:

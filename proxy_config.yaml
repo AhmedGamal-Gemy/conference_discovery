@@ -1,22 +1,28 @@
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
 model_list:
-  # Primary — Cerebras (fast, 5 RPM, 1M tokens/day, no card)
-  - model_name: cerebras-small
+  # Fast model — simple tasks (orchestration, validation, discovery, filtering)
+  - model_name: freetheai-fast
     litellm_params:
-      model: cerebras/gpt-oss-120b
-      api_key: os.environ/CEREBRAS_API_KEY
-    rpm: 5
-    tpm: 30000
-    timeout: 60
+      model: openai/opc/deepseek-v4-flash-free
+      api_base: https://api.freetheai.xyz/v1
+      api_key: os.environ/FREETHEAI_API_KEY
+    rpm: 10
+    tpm: 100000
+    timeout: 90
     num_retries: 3
 
-  # Fallback — Mistral
-  - model_name: mistral-small
+  # Smart model — complex extraction (structured data, link classification)
+  - model_name: freetheai-smart
     litellm_params:
-      model: mistral/mistral-small-latest
-      api_key: os.environ/MISTRAL_API_KEY
-    rpm: 2
-    tpm: 500000
-    timeout: 60
+      model: openai/bbl/gpt-5.5-mini
+      api_base: https://api.freetheai.xyz/v1
+      api_key: os.environ/FREETHEAI_API_KEY
+    rpm: 10
+    tpm: 100000
+    timeout: 120
     num_retries: 3
 
 general_settings:
