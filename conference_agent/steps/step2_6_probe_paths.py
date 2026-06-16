@@ -19,7 +19,6 @@ from conference_agent.config import settings
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.tools.path_probe import probe_common_paths
 from conference_agent.prompts.extraction import PROBE_PATHS_PROMPT
-from conference_agent.steps._callbacks import strip_reasoning_content_before_model
 
 # Logging instrumentation for step2_6_probe_paths
 # DEBUG: Log entry point and what paths are being probed
@@ -48,5 +47,4 @@ probe_paths_agent = LlmAgent(
         FunctionTool(func=probe_common_paths),
     ],
     output_key=output_keys.PROBED_LINKS,
-    before_model_callback=strip_reasoning_content_before_model,
 )

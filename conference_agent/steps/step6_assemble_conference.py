@@ -19,7 +19,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.schemas.conference import Conference
 from conference_agent.prompts.extraction import ASSEMBLE_CONFERENCE_PROMPT
-from conference_agent.steps._callbacks import strip_reasoning_content_before_model, strip_markdown_codeblock
+from conference_agent.steps._callbacks import strip_markdown_codeblock
 
 # Logging instrumentation for step6_assemble_conference
 # DEBUG: Log entry point and all inputs being assembled
@@ -51,6 +51,5 @@ assemble_conference_agent = LlmAgent(
     instruction=ASSEMBLE_CONFERENCE_PROMPT,
     output_schema=Conference,
     output_key=output_keys.CONFERENCE_DATA,
-    before_model_callback=strip_reasoning_content_before_model,
     after_model_callback=strip_markdown_codeblock,
 )

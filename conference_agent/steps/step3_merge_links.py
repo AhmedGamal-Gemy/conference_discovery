@@ -17,7 +17,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.homepage import SubPages
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.prompts.extraction import MERGE_LINKS_PROMPT
-from conference_agent.steps._callbacks import strip_reasoning_content_before_model, strip_markdown_codeblock, resolve_relative_urls
+from conference_agent.steps._callbacks import strip_markdown_codeblock, resolve_relative_urls
 
 # Logging instrumentation for step3_merge_links
 # DEBUG: Log entry point and what data is being merged
@@ -47,6 +47,5 @@ merge_links_agent = LlmAgent(
     instruction=MERGE_LINKS_PROMPT,
     output_schema=SubPages,
     output_key=output_keys.SUB_PAGES_URLS,
-    before_model_callback=strip_reasoning_content_before_model,
     after_model_callback=[strip_markdown_codeblock, resolve_relative_urls],
 )

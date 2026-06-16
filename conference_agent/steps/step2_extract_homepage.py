@@ -9,7 +9,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.homepage import HomepageData
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.prompts.extraction import HOMEPAGE_EXTRACTION_PROMPT
-from conference_agent.steps._callbacks import strip_reasoning_content_before_model, strip_markdown_codeblock, resolve_relative_urls
+from conference_agent.steps._callbacks import strip_markdown_codeblock, resolve_relative_urls
 
 # Logging instrumentation for step2_extract_homepage
 # DEBUG: Log entry point and what data is being processed
@@ -37,7 +37,6 @@ extract_homepage_agent = LlmAgent(
     instruction=HOMEPAGE_EXTRACTION_PROMPT,
     output_key=output_keys.HOMEPAGE_DATA,
     output_schema=HomepageData,
-    before_model_callback=strip_reasoning_content_before_model,
     after_model_callback=[strip_markdown_codeblock, resolve_relative_urls],
 )
 

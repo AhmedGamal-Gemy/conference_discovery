@@ -16,7 +16,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.discovered_links import DiscoveredLinksData
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.prompts.extraction import DISCOVER_LINKS_PROMPT
-from conference_agent.steps._callbacks import strip_reasoning_content_before_model, strip_markdown_codeblock, resolve_relative_urls
+from conference_agent.steps._callbacks import strip_markdown_codeblock, resolve_relative_urls
 
 # Logging instrumentation for step2_5_discover_links
 # DEBUG: Log entry point and what data is being processed
@@ -44,6 +44,5 @@ discover_links_agent = LlmAgent(
     instruction=DISCOVER_LINKS_PROMPT,
     output_schema=DiscoveredLinksData,
     output_key=output_keys.DISCOVERED_LINKS,
-    before_model_callback=strip_reasoning_content_before_model,
     after_model_callback=[strip_markdown_codeblock, resolve_relative_urls],
 )

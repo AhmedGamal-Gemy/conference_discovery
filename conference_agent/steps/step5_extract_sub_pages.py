@@ -16,7 +16,7 @@ from conference_agent.config import settings
 from conference_agent.schemas.output_keys import output_keys
 from conference_agent.schemas.sub_pages_data import SubPagesData
 from conference_agent.prompts.extraction import SUB_PAGES_EXTRACTION_PROMPT
-from conference_agent.steps._callbacks import strip_reasoning_content_before_model, strip_markdown_codeblock
+from conference_agent.steps._callbacks import strip_markdown_codeblock
 
 # Logging instrumentation for step5_extract_sub_pages
 # DEBUG: Log entry point and what data is being processed
@@ -45,6 +45,5 @@ extract_sub_pages_agent = LlmAgent(
     instruction=SUB_PAGES_EXTRACTION_PROMPT,
     output_schema=SubPagesData,
     output_key=output_keys.SUB_PAGES_DATA,
-    before_model_callback=strip_reasoning_content_before_model,
     after_model_callback=strip_markdown_codeblock,
 )
