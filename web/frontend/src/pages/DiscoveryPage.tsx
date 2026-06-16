@@ -5,7 +5,8 @@ import { usePipeline } from '../hooks/usePipeline';
 import { usePipelineBatch, type BatchConference } from '../hooks/usePipelineBatch';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Play, X, ChevronDown, ChevronRight, CheckCircle2, Circle, XCircle, Loader2, RotateCcw } from 'lucide-react';
+import { Play, X, ChevronDown, ChevronRight, CheckCircle2, Circle, XCircle, Loader2, RotateCcw, ChevronUp } from 'lucide-react';
+import { cn } from '../lib/utils';
 import type { Conference } from '../types/conference';
 import type { PipelineStep } from '../types/pipeline';
 
@@ -37,6 +38,68 @@ function StepIndicator({ steps, step }: { steps: PipelineStep[]; step: string })
   if (stepData.status === 'complete') return <CheckCircle2 className="size-3.5 text-green-500" />;
   if (stepData.status === 'error') return <XCircle className="size-3.5 text-destructive" />;
   return <Loader2 className="size-3.5 text-primary animate-spin" />;
+}
+
+function SpeakerSection({ conference }: { conference: Conference }) {
+  const [expanded, setExpanded] = useState(false);
+  const speakers = conference.speakers ?? [];
+
+  if (speakers.length === 0) return null;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-1.5 text-left group"
+      >
+        <span className="text-sm">
+          <span className="text-muted-foreground">Speakers: </span>
+          <span>{conference.total_speakers} confirmed</span>
+          {!expanded && speakers.length > 0 && (
+            <span className="text-muted-foreground">
+              {' — '}{speakers.slice(0, 3).map((s: any) => s.name).join(', ')}
+              {speakers.length > 3 && `, and ${speakers.length - 3} more`}
+            </span>
+          )}
+        </span>
+        <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-180')} />
+      </button>
+
+      {expanded && (
+        <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border bg-muted/20">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+              <tr className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2 hidden sm:table-cell">Title / Affiliation</th>
+                <th className="px-3 py-2 w-20">Origin</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {speakers.map((speaker: any, idx: number) => (
+                <tr key={idx} className="hover:bg-muted/40">
+                  <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{speaker.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">
+                    {[speaker.title, speaker.affiliation].filter(Boolean).join(', ') || '—'}
+                  </td>
+                  <td className="px-3 py-2">
+                    {speaker.is_usa === true && <Badge variant="outline" className="text-[10px] px-1.5 py-0">US</Badge>}
+                    {speaker.is_usa === false && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{speaker.country || 'Non-US'}</Badge>
+                    )}
+                    {speaker.is_usa === null && speaker.country && (
+                      <span className="text-xs text-muted-foreground">{speaker.country}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function StepProgressBar({ steps, showLabel = false }: { steps: PipelineStep[]; showLabel?: boolean }) {
@@ -152,12 +215,26 @@ function ConferenceResultCard({
                   <span>{[conference.venue_city, conference.venue_country].filter(Boolean).join(', ')}</span>
                 </div>
               )}
+              <SpeakerSection conference={conference} />
+
+              {/* Stats row */}
               {conference.total_speakers > 0 && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Speakers: </span>
-                  <span>{conference.total_speakers} confirmed{conference.speakers?.length > 0 ? ` — ${conference.speakers.slice(0, 5).map((s: any) => s.name).join(', ')}${conference.speakers.length > 5 ? '...' : ''}` : ''}</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="flex flex-col items-center gap-0.5 rounded-lg border bg-muted/30 px-2 py-2">
+                    <span className="text-lg font-bold tabular-nums leading-none text-foreground">{conference.total_speakers}</span>
+                    <span className="text-[10px] text-muted-foreground">Total</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5 rounded-lg border bg-muted/30 px-2 py-2">
+                    <span className="text-lg font-bold tabular-nums leading-none text-foreground">{conference.non_local_count}</span>
+                    <span className="text-[10px] text-muted-foreground">Non-local</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5 rounded-lg border bg-muted/30 px-2 py-2">
+                    <span className="text-lg font-bold tabular-nums leading-none text-foreground">{conference.non_usa_count}</span>
+                    <span className="text-[10px] text-muted-foreground">Non-USA</span>
+                  </div>
                 </div>
               )}
+
               {conference.sector_tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {conference.sector_tags.map((tag: string, i: number) => (
@@ -268,12 +345,26 @@ function BatchStatusCard({
               <span>{[batch.conference.venue_city, batch.conference.venue_country].filter(Boolean).join(', ')}</span>
             </div>
           )}
-          {batch.conference.total_speakers > 0 && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Speakers: </span>
-              <span>{batch.conference.total_speakers} confirmed{batch.conference.speakers?.length > 0 ? ` — ${batch.conference.speakers.slice(0, 5).map((s: any) => s.name).join(', ')}${batch.conference.speakers.length > 5 ? '...' : ''}` : ''}</span>
+          {batch.conference && <SpeakerSection conference={batch.conference} />}
+
+          {/* Stats row */}
+          {batch.conference && batch.conference.total_speakers > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-col items-center gap-0.5 rounded-lg border bg-muted/30 px-2 py-2">
+                <span className="text-lg font-bold tabular-nums leading-none text-foreground">{batch.conference.total_speakers}</span>
+                <span className="text-[10px] text-muted-foreground">Total</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 rounded-lg border bg-muted/30 px-2 py-2">
+                <span className="text-lg font-bold tabular-nums leading-none text-foreground">{batch.conference.non_local_count}</span>
+                <span className="text-[10px] text-muted-foreground">Non-local</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 rounded-lg border bg-muted/30 px-2 py-2">
+                <span className="text-lg font-bold tabular-nums leading-none text-foreground">{batch.conference.non_usa_count}</span>
+                <span className="text-[10px] text-muted-foreground">Non-USA</span>
+              </div>
             </div>
           )}
+
           {batch.conference.sector_tags?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {batch.conference.sector_tags.map((tag: string, i: number) => (

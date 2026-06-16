@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Conference } from '../types/conference';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -172,8 +173,7 @@ function StatCard({
 
 function CardWithData({ conference }: { conference: Conference }) {
   const speakerList = conference.speakers ?? [];
-  const visibleSpeakers = speakerList.slice(0, 10);
-  const remainingCount = speakerList.length - 10;
+  const [speakersExpanded, setSpeakersExpanded] = useState(false);
 
   return (
     <Card data-testid="conference-card" className="w-full">
@@ -341,9 +341,14 @@ function CardWithData({ conference }: { conference: Conference }) {
         {/* ── Speakers section ── */}
         {speakerList.length > 0 && (
           <div className="space-y-2">
-            <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {/* ── Collapsible header ── */}
+            <button
+              type="button"
+              onClick={() => setSpeakersExpanded(!speakersExpanded)}
+              className="flex w-full items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+            >
               <svg
-                className="size-3.5"
+                className="size-3.5 shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -355,32 +360,70 @@ function CardWithData({ conference }: { conference: Conference }) {
                   d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                 />
               </svg>
-              <span data-testid="speaker-count">
+              <span data-testid="speaker-count" className="flex-1 text-left">
                 {speakerList.length} speaker
                 {speakerList.length !== 1 ? 's' : ''} confirmed
               </span>
-            </h4>
-            <ul className="space-y-1.5">
-              {visibleSpeakers.map((speaker, idx) => (
-                <li key={idx} className="text-sm leading-snug">
-                  <span className="font-medium text-foreground">
-                    {speaker.name}
-                  </span>
-                  {(speaker.title || speaker.affiliation) && (
-                    <span className="text-muted-foreground">
-                      {' — '}
-                      {[speaker.title, speaker.affiliation]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {remainingCount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                and {remainingCount} more
+              <svg
+                className={cn(
+                  'size-4 transition-transform',
+                  speakersExpanded && 'rotate-180',
+                )}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* ── Summary line (collapsed) ── */}
+            {!speakersExpanded && (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {speakerList.slice(0, 5).map((s) => s.name).join(', ')}
+                {speakerList.length > 5 && `, and ${speakerList.length - 5} more`}
               </p>
+            )}
+
+            {/* ── Full list (expanded) ── */}
+            {speakersExpanded && (
+              <div className="max-h-80 overflow-y-auto rounded-lg border bg-muted/20">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+                    <tr className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-3 py-2">Name</th>
+                      <th className="px-3 py-2 hidden sm:table-cell">Title / Affiliation</th>
+                      <th className="px-3 py-2 w-20">Origin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {speakerList.map((speaker, idx) => (
+                      <tr key={idx} className="hover:bg-muted/40">
+                        <td className="px-3 py-2 font-medium text-foreground">
+                          {speaker.name}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">
+                          {[speaker.title, speaker.affiliation].filter(Boolean).join(', ') || '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          {speaker.is_usa === true && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">US</Badge>
+                          )}
+                          {speaker.is_usa === false && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {speaker.country || 'Non-US'}
+                            </Badge>
+                          )}
+                          {speaker.is_usa === null && speaker.country && (
+                            <span className="text-xs text-muted-foreground">{speaker.country}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
