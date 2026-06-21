@@ -13,6 +13,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "structlog>=25.1.0",
     "exa-py>=2.13.0",
     "google-adk[extensions]>=2.1.0",
     "litellm>=1.83.14",

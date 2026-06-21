@@ -1,5 +1,7 @@
 """Combined output of step5 — all sub-page extractions."""
 
+from typing import Optional
+
 from pydantic import BaseModel
 
 from .speaker import SpeakersData
@@ -13,3 +15,5 @@ class SubPagesData(BaseModel):
     speakers: SpeakersData
     venue: VenueData
     registration: RegistrationData
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None

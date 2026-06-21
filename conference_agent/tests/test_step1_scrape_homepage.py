@@ -10,7 +10,7 @@ async def test_scrape_homepage():
     """Test step1_scrape_homepage agent using Runner.
     
     Prerequisites:
-    - MCP server running at http://localhost:8016/mcp
+    - MCP server running at http://localhost:8017/mcp
     - MISTRAL_API_KEY set in environment
     - Valid config/settings.yaml
     """

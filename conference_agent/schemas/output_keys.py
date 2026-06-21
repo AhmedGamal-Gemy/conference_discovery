@@ -9,9 +9,10 @@ class output_keys(StrEnum):
     PROBED_LINKS = auto()
     SUB_PAGES_URLS = auto()
     SCRAPED_SUB_PAGES = auto()
+    SUB_PAGES_DATA = auto()
     SPEAKERS_DATA = auto()
     VENUE_DATA = auto()
     REGISTRATION_DATA = auto()
-    SUB_PAGES_DATA = auto()
+    ENRICHMENT_STATUS = auto()
     VALIDATION_DATA = auto()
-
+    CONFERENCE_DATA = auto()

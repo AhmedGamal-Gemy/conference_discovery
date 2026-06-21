@@ -8,14 +8,19 @@ NO output_schema — pure tool-calling agent to avoid the known ADK
 conflict between tools + output_schema.
 """
 
+import logging
+
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 
 from conference_agent.config import settings
 from conference_agent.schemas.output_keys import output_keys
+from conference_agent.steps._callbacks import strip_markdown_codeblock
 from conference_agent.tools.scrapling_tool import scrapling_toolset
 from conference_agent.prompts.extraction import SCRAPE_SUB_PAGES_PROMPT
 
+logger = logging.getLogger(__name__)
+logger.info("STEP  Registered — scrape_sub_pages_agent (uses scrapling MCP toolset)")
 
 scrape_sub_pages_agent = LlmAgent(
     model=LiteLlm(model=settings.llm.extraction.model),
@@ -24,4 +29,5 @@ scrape_sub_pages_agent = LlmAgent(
     instruction=SCRAPE_SUB_PAGES_PROMPT,
     tools=[scrapling_toolset],
     output_key=output_keys.SCRAPED_SUB_PAGES,
+    after_model_callback=strip_markdown_codeblock,
 )

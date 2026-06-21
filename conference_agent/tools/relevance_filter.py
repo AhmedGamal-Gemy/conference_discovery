@@ -1,23 +1,30 @@
 import json
+import logging
+import time
+
 import litellm
 
 from conference_agent.config import settings
 
-import os
-from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
-load_dotenv()
+# LiteLLM proxy routes via LITELLM_PROXY_API_BASE / LITELLM_PROXY_API_KEY env vars
+# No direct api_key — proxy handles auth.
 
 MODEL = settings.llm.relevance_filter.model
 TEMP = settings.llm.relevance_filter.temperature
+logger.info("TOOL  Relevance filter loaded — model=%s, temp=%.1f", MODEL, TEMP)
 
 
-async def is_relevant_conference(
+def is_relevant_conference(
     topic: str,
     title: str,
     snippet: str,
-    url: str
-):
+    url: str,
+) -> bool:
+    t0 = time.time()
+    logger.debug("RELEVANCE  Checking — url=%s, title=%s", url, title[:60])
+
     prompt = f"""
 You are a conference relevance classifier.
 
@@ -44,18 +51,33 @@ Snippet:
 {snippet}
 """
 
-    response = await litellm.acompletion(
-        model=MODEL,
-        api_key = os.getenv("MISTRAL_API_KEY"),
-        temperature=TEMP,
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-        response_format={"type": "json_object"}
-    )
+    try:
+        response = litellm.completion(
+            model=MODEL,
+            temperature=TEMP,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+        )
 
-    content = response.choices[0].message.content
+        content = response.choices[0].message.content
+        parsed = json.loads(content)
+        result = parsed.get("relevant", False)
 
-    parsed = json.loads(content)
+        elapsed = time.time() - t0
+        if result:
+            logger.info("RELEVANCE  ✓ ACCEPTED — %s (%.1fs)", title[:60], elapsed)
+        else:
+            logger.debug("RELEVANCE  ✗ REJECTED — %s (%.1fs)", title[:60], elapsed)
 
-    return parsed["relevant"]
+        return result
+
+    except json.JSONDecodeError:
+        elapsed = time.time() - t0
+        logger.error("RELEVANCE  JSON decode failed for %s (%.1fs): content=%r", url, elapsed, content[:200])
+        return False
+    except Exception as exc:
+        elapsed = time.time() - t0
+        logger.error("RELEVANCE  Check failed for %s (%.1fs): %s", url, elapsed, exc)
+        return False

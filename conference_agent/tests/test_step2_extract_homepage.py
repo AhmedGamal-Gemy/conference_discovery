@@ -12,7 +12,7 @@ async def test_extract_homepage():
     """Test step2_extract_homepage agent using Runner.
     
     Prerequisites:
-    - MCP server running at http://localhost:8016/mcp
+    - MCP server running at http://localhost:8017/mcp
     - MISTRAL_API_KEY set in environment
     - Valid config/settings.yaml
     """

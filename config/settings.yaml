@@ -5,19 +5,26 @@
 discovery:
   topic: "medical"
   months_ahead: 3
+  query_templates: []              # Empty = use defaults from query_generator
+  subfields: ["cardiology", "radiology", "oncology", "neurology", "pediatrics"]  # Topic sub-categories for subfield queries
   sources:
     exa: true
     directories: false      # disabled for demo
     org_websites: false     # disabled for demo
 
 exa:
-  num_results: 5
-  pages_per_query: 2
+  num_results: 10            # Increased from 5 — more URLs before dedup
+  pages_per_query: 2         # Reserved for future pagination
+  type: "neural"             # Neural (semantic) search — handles query optimization internally
+  text_max_chars: 1000       # Richer snippets for relevance filter
+  include_domains: []        # Restrict search to these domains (empty = no restriction)
+  exclude_domains: []        # Exclude these domains from search results
 
 validation:
   min_speakers: 5
-  min_non_local: 5
-  min_travel_hours: 4
+  min_non_local: null              # null = skip this check until geocoding step is wired
+  min_travel_hours: null           # null = skip this check until geocoding step is wired
+  min_non_usa: 2                 # min non-USA speakers required to pass
   date_window:
     min_days: 30            # reject if < 1 month away
     max_days: 90            # queue if > 3 months away
@@ -34,7 +41,7 @@ llm:
     model: "mistral-small"
     temperature: 0.2
   extraction:
-    model: "mistral-small"
+    model: "mistral-large"
     temperature: 0.1
   validation:
     model: "mistral-small"
@@ -43,6 +50,6 @@ llm:
     model: "mistral-small"
     temperature: 0.0
 
-scrapling_mcp_url: "http://localhost:8016/mcp"
+scrapling_mcp_url: "http://localhost:8017/mcp"
 
-debug : true
+debug : false

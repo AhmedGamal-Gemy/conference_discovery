@@ -21,6 +21,6 @@ class Speaker(BaseModel):
 class SpeakersData(BaseModel):
     """Output of Prompt B (speakers page)."""
 
-    speakers: list[Speaker]
-    speakers_confirmed: bool
-    notes: str
+    speakers: list[Speaker] = []
+    speakers_confirmed: bool = False
+    notes: str = ""

@@ -43,7 +43,7 @@ Central configuration. Loads settings from YAML + env via `SystemSettings`, then
 `Workflow` (ADK 2.0 graph) with 6 sub-agents in sequence. Each sub-agent `output_key` stores into the parent session state dict. All LLM calls go through the LiteLLM proxy, which handles rate limiting natively (max 20 retries, exponential backoff).
 
 ### tools/scrapling_tool.py
-Creates `McpToolset` using `StreamableHTTPConnectionParams` to connect to Scrapling MCP at `http://localhost:8016/mcp`. Critical: includes `headers={"Accept": "application/json, text/event-stream"}` and `timeout=30.0` — without these, the MCP connection hangs or fails.
+Creates `McpToolset` using `StreamableHTTPConnectionParams` to connect to Scrapling MCP at `http://localhost:8017/mcp`. Critical: includes `headers={"Accept": "application/json, text/event-stream"}` and `timeout=30.0` — without these, the MCP connection hangs or fails.
 
 ### tools/path_probe.py
 Opens direct MCP sessions (not ADK tool routing) to probe common URL paths (`/speakers/`, `/venue/`, `/registration/`, etc.) on a conference website. Returns only paths with >100 chars content that don't match 404 patterns.

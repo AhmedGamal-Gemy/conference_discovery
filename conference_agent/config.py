@@ -3,7 +3,7 @@ import litellm
 # Client-side retries disabled — the LiteLLM proxy handles rate limiting.
 litellm.num_retries = 0
 
-from typing import Tuple, Type
+from typing import Optional, Tuple, Type
 from pydantic import BaseModel
 from pydantic_settings import (
     BaseSettings,
@@ -13,8 +13,10 @@ from pydantic_settings import (
 )
 
 from pathlib import Path
+from dotenv import load_dotenv
 
 _ROOT = Path(__file__).parent.parent  # conference_agent/ → project root
+load_dotenv(_ROOT / "conference_agent" / ".env")  # Must load .env BEFORE proxy key resolution
 
 # ── Nested models ──────────────────────────────────────────────────
 
@@ -28,12 +30,18 @@ class DiscoverySources(BaseModel):
 class DiscoveryConfig(BaseModel):
     topic: str = "medical"
     months_ahead: int = 3
+    query_templates: list[str] = []  # Empty = use defaults from query_generator
+    subfields: list[str] = []  # Topic-specific sub-categories for subfield queries (empty = no subfield queries)
     sources: DiscoverySources = DiscoverySources()
 
 
 class ExaConfig(BaseModel):
     num_results: int = 10
     pages_per_query: int = 2
+    type: str = "neural"           # Exa search type — neural (semantic) handles query optimization internally
+    text_max_chars: int = 1000     # Richer snippets for relevance filter (was hardcoded 500)
+    include_domains: list[str] = []   # Restrict search to these domains (empty = no restriction)
+    exclude_domains: list[str] = []   # Exclude these domains from search results
 
 
 class DateWindow(BaseModel):
@@ -43,8 +51,9 @@ class DateWindow(BaseModel):
 
 class ValidationConfig(BaseModel):
     min_speakers: int = 5
-    min_non_local: int = 5
-    min_travel_hours: int = 4
+    min_non_local: Optional[int] = None
+    min_travel_hours: Optional[int] = None
+    min_non_usa: Optional[int] = None
     date_window: DateWindow = DateWindow()
 
 

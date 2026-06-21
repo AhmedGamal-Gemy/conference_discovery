@@ -1,4 +1,6 @@
 import asyncio
+import sys
+import io
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
@@ -12,7 +14,7 @@ async def test_full_pipeline():
     """Test the full Workflow pipeline: scrape → extract → discover → probe → merge → scrape sub-pages.
 
     Prerequisites:
-    - MCP server running at http://localhost:8016/mcp
+    - MCP server running at http://localhost:8017/mcp
     - MISTRAL_API_KEY set in environment
     - Valid config/settings.yaml
     """
@@ -37,24 +39,24 @@ async def test_full_pipeline():
 
     # 4. Run it
     print(f"\nRunning pipeline orchestrator (Workflow)...")
-    print("Expected flow: scrape -> extract -> discover -> probe -> merge -> scrape_sub_pages\n")
+    print("Expected flow: scrape -> extract -> discover -> probe -> merge -> scrape_sub -> extract_sub -> validate\n")
 
     async for event in runner.run_async(
         user_id="test_user",
         session_id="test_session",
         new_message=Content(role="user", parts=[Part(text="Process this conference")])
     ):
-        # Print events as they happen
+        # Print events as they happen (safe encoding)
         if event.content and event.content.parts:
             part = event.content.parts[0]
             if part.text:
                 preview = part.text[:200].replace("\n", " ")
-                print(f"[{event.author}]: {preview}")
+                print(f"[{event.author}]: {preview}", flush=True)
             elif part.function_call:
-                print(f"[{event.author}]: [TOOL CALL] {part.function_call.name}")
+                print(f"[{event.author}]: [TOOL CALL] {part.function_call.name}", flush=True)
 
         if event.is_final_response():
-            print(f"\n=== FINAL RESPONSE from {event.author} ===")
+            print(f"\n=== FINAL RESPONSE from {event.author} ===", flush=True)
 
     # 5. Get updated session
     updated_session = await session_service.get_session(
@@ -105,6 +107,7 @@ async def test_full_pipeline():
         output_keys.DISCOVERED_LINKS,
         output_keys.SUB_PAGES_URLS,
         output_keys.SCRAPED_SUB_PAGES,
+        output_keys.VALIDATION_DATA,
     ]
 
     for ek in expected_keys:
@@ -133,7 +136,7 @@ async def test_full_pipeline():
         print("  1. scrape_homepage_agent -> HOMEPAGE_MARKDOWN")
         print("  2. extract_homepage_agent -> HOMEPAGE_DATA")
         print("  3. discover_links_agent -> DISCOVERED_LINKS")
-        print("  4. probe_paths_agent -> PROBED_LINKS")
+        print("  4. probe_paths_step -> PROBED_LINKS")
         print("  5. merge_links_agent -> SUB_PAGES_URLS")
         print("  6. scrape_sub_pages_agent -> SCRAPED_SUB_PAGES")
 

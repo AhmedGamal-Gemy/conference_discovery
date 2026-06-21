@@ -1,20 +1,22 @@
 model_list:
+  # Mistral Small — fast/cheap for orchestrator, discovery, relevance
   - model_name: mistral-small
     litellm_params:
       model: mistral/mistral-small-latest
       api_key: os.environ/MISTRAL_API_KEY
-      rpm: 10
-      tpm: 1000
+      rpm: 5
+      tpm: 5000
       timeout: 120
       num_retries: 20
-  
+
+  # Mistral Large — best extraction quality for homepage/sub-page data
   - model_name: mistral-large
     litellm_params:
       model: mistral/mistral-large-latest
       api_key: os.environ/MISTRAL_API_KEY
-      rpm: 10
-      tpm: 500
-      timeout: 120
+      rpm: 5
+      tpm: 5000
+      timeout: 180          # larger model needs more time
       num_retries: 20
 
 general_settings:

@@ -13,12 +13,14 @@ STEP1_SCRAPE_HOMEPAGE_PROMPT = """
 You are a web scraping agent.
 Fetch the conference homepage at this URL: {state.output_keys.URL}
 
+Available tools: stealthy_fetch, screenshot, get, fetch, bulk_fetch, bulk_stealthy_fetch, open_session, close_session, list_sessions
+
 Use the stealthy_fetch tool with these exact parameters:
 - url: {state.output_keys.URL}
 - timeout: 60000
 - solve_cloudflare: true
 - headless: true
-- main_content_only: true
+- main_content_only: false
 
 Return the raw markdown content only. No explanation, no commentary.
 """
@@ -27,6 +29,10 @@ Return the raw markdown content only. No explanation, no commentary.
 HOMEPAGE_EXTRACTION_PROMPT = """
 You are a data extraction assistant. You will be given the markdown content of a conference homepage.
 
+CRITICAL: You MUST return valid JSON. A response with all-null fields is
+acceptable. A refusal to return JSON will cause the system to fail.
+Never say "I cannot extract" — always return the JSON skeleton with nulls.
+
 Extract the following information and return it as a JSON object matching this exact structure:
 
 {
@@ -34,6 +40,15 @@ Extract the following information and return it as a JSON object matching this e
     "date_start": "YYYY-MM-DD or null if not found",
     "date_end": "YYYY-MM-DD or null if not found",
     "industry": "The scientific or academic field (e.g. 'medicine', 'engineering', 'computer science')",
+    "keynote_speakers": [
+        {
+            "name": "Full name of the keynote or featured speaker",
+            "title": "Academic or professional title (e.g. 'Prof.', 'Dr.', 'CEO') or null",
+            "affiliation": "University, institution, or company name — infer from context if not explicitly stated, or null only if truly unknown",
+            "country": "Country of the affiliation — infer from the affiliation name, bio, or any contextual clues (e.g. 'University of Tokyo' → 'Japan', 'MIT' → 'USA'). Return null ONLY if no inference is possible.",
+            "is_scientific": true or false
+        }
+    ],
     "sub_pages": {
         "speakers": "Full absolute URL to the speakers page or null",
         "venue": "Full absolute URL to the venue page or null",
@@ -46,7 +61,29 @@ Rules:
 - For sub_pages URLs, always return absolute URLs (include the base domain).
 - If a field is not found, return null for that field.
 - For industry, infer from the conference topic if not explicitly stated.
-- For dates, only extract dates for THIS specific upcoming conference edition, not past editions.
+
+DATE EXTRACTION RULES (read carefully):
+- Extract dates ONLY for THIS specific upcoming conference edition, not past editions.
+- Search EVERYWHERE on the page: hero banners, header area, sidebar, footer, event details sections, announcement blocks, meta text, and the title itself.
+- Do NOT confuse submission deadlines, notification dates, or registration deadlines with conference dates — extract only the event dates.
+- If you see ONLY a single date (e.g., just a year or just a month), still extract it rather than returning null.
+- If ALL you see is a year like "2026", extract that year — set date_start to "2026-01-01" and date_end to "2026-12-31" so the system can process the conference.
+- Common places dates appear: right after the conference name, in a hero section, in a "Save the Date" banner, in a header/footer bar, in a date range pattern like "Sep 7 – Sep 10, 2026" or "June 18-20, 2026".
+- Convert any date format to YYYY-MM-DD. Examples:
+  - "September 7 – September 10, 2026" → date_start="2026-09-07", date_end="2026-09-10"
+  - "June 18-20, 2026" → date_start="2026-06-18", date_end="2026-06-20"
+  - "7-10 September 2026" → date_start="2026-09-07", date_end="2026-09-10"
+  - "Sep 7–10, 2026" → date_start="2026-09-07", date_end="2026-09-10"
+- Only return null if there is genuinely NO date information of any kind on the entire page.
+
+KEYNOTE SPEAKERS rules:
+- Extract ONLY speakers explicitly named on the homepage (keynote speakers, invited speakers, featured speakers, plenary speakers).
+- Do NOT extract organizers, committee members, or reviewers.
+- If the homepage lists "coming soon", "to be announced", or has no named speakers, return an empty keynote_speakers list.
+- is_scientific is true if the speaker is an academic researcher, professor, scientist, or medical professional. false for industry executives, journalists, or non-scientific speakers.
+- INFER country and affiliation from any available context: affiliation name (e.g. 'University of Bournemouth' → 'United Kingdom'), bio text, title, or department name. Do NOT default to null when you can reasonably infer the country.
+- Common inference patterns: university name contains city/region → country; well-known institutions → known country (MIT, Stanford → USA; Oxford, Cambridge → United Kingdom; ETH Zurich → Switzerland; Max Planck → Germany).
+- A speaker name appearing in a "Past Speakers" section counts ONLY if it also appears in the current/upcoming edition section.
 
 Homepage markdown:
 {state.output_keys.HOMEPAGE_MARKDOWN}
@@ -64,8 +101,8 @@ Extract the following information and return it as a JSON object matching this e
         {
             "name": "Full name of the speaker",
             "title": "Academic or professional title (e.g. 'Prof.', 'Dr.', 'CEO') or null",
-            "affiliation": "University, institution, or company name or null",
-            "country": "Country of the affiliation or null",
+            "affiliation": "University, institution, or company name — infer from context if not explicitly stated, or null only if truly unknown",
+            "country": "Country of the affiliation — infer from the affiliation name, bio, or any contextual clues (e.g. 'University of Tokyo' → 'Japan', 'MIT' → 'USA'). Return null ONLY if no inference is possible.",
             "is_scientific": true or false
         }
     ]
@@ -76,6 +113,8 @@ Rules:
 - Set speakers_confirmed to true ONLY if the speakers listed are confirmed for THIS specific upcoming conference edition.
 - Set speakers_confirmed to false if: the list says "coming soon", "to be announced", "will be updated", shows only past edition speakers, or the list is empty.
 - is_scientific is true if the speaker is an academic researcher, professor, scientist, or medical professional. false for industry executives, journalists, or non-scientific speakers.
+- INFER country and affiliation from any available context: affiliation name (e.g. 'University of Bournemouth' → 'United Kingdom'), bio text, title, or department name. Do NOT default to null when you can reasonably infer the country.
+- Common inference patterns: university name contains city/region → country; well-known institutions → known country (MIT, Stanford → USA; Oxford, Cambridge → United Kingdom; ETH Zurich → Switzerland; Max Planck → Germany).
 - Only include speakers, not organizers or committee members.
 - If no speakers are found, return an empty list and set speakers_confirmed to false.
 
@@ -147,8 +186,8 @@ Extract the following for each section:
             {
                 "name": "Full name of the speaker",
                 "title": "Academic or professional title (e.g. 'Prof.', 'Dr.', 'CEO') or null",
-                "affiliation": "University, institution, or company name or null",
-                "country": "Country of the affiliation or null",
+                "affiliation": "University, institution, or company name — infer from context if not explicitly stated, or null only if truly unknown",
+                "country": "Country of the affiliation — infer from the affiliation name, bio, or any contextual clues (e.g. 'University of Tokyo' → 'Japan', 'MIT' → 'USA'). Return null ONLY if no inference is possible.",
                 "is_scientific": true or false
             }
         ],
@@ -161,6 +200,8 @@ Rules for speakers:
 - Set speakers_confirmed to true ONLY if the speakers listed are confirmed for THIS specific upcoming conference edition.
 - Set speakers_confirmed to false if: the list says "coming soon", "to be announced", "will be updated", shows only past edition speakers, or the list is empty.
 - is_scientific is true if the speaker is an academic researcher, professor, scientist, or medical professional. false for industry executives, journalists, or non-scientific speakers.
+- INFER country and affiliation from any available context: affiliation name (e.g. 'University of Bournemouth' → 'United Kingdom'), bio text, title, or department name. Do NOT default to null when you can reasonably infer the country.
+- Common inference patterns: university name contains city/region → country; well-known institutions → known country (MIT, Stanford → USA; Oxford, Cambridge → United Kingdom; ETH Zurich → Switzerland; Max Planck → Germany).
 - Only include speakers, not organizers or committee members.
 - If no speakers are found, return an empty list and set speakers_confirmed to false.
 
@@ -168,7 +209,7 @@ Rules for speakers:
 {
     "venue": {
         "venue_name": "Full name of the venue or null",
-        "venue_address": "Full street address or null",
+        "venue_address": "Full street address. If no clean address string exists, combine available location information (venue name, city, postcode, street mentions) into the best possible address. Return null only if there is zero location information on the entire page.",
         "city": "City name or null",
         "country": "Country name or null",
         "is_hotel": true or false
@@ -179,6 +220,8 @@ Rules for venue:
 - Set is_hotel to true if the venue is a hotel, resort, or similar accommodation facility.
 - Set is_hotel to false if the venue is a university, convention center, research institute, or any non-accommodation facility.
 - If the venue name is not found or the page only shows a general city without a specific venue, return null for venue_name and venue_address.
+- If the venue name is found but no full street address exists, construct an address from available fragments (e.g., venue name + city + postcode).
+- A postcode or city name combined with the venue name counts as a valid venue_address.
 
 === REGISTRATION EXTRACTION ===
 {
@@ -195,6 +238,23 @@ Rules for registration:
     - The page recommends hotels without covering the cost.
     - There is no mention of accommodation at all.
 - When in doubt, return false.
+
+=== DATES EXTRACTION ===
+Extract the conference dates from ALL available content across SPEAKERS, VENUE, and REGISTRATION sections.
+
+{
+    "date_start": "YYYY-MM-DD or null if not found across any section",
+    "date_end": "YYYY-MM-DD or null if not found across any section"
+}
+
+Rules for dates:
+- Search ALL sections (SPEAKERS, VENUE, REGISTRATION) for date information about the conference.
+- Look for date patterns: "7 September 2026", "Sep 7-10, 2026", "September 7-10, 2026", "Sept 7–10, 2026", "7-10 Sep 2026".
+- Infer dates from contextual clues. For example: if registration mentions "Monday evening keynote" and "Tuesday/Wednesday/Thursday" as options, the conference runs Mon-Thu.
+- If you find a single date like "7 September 2026" for a pre-conference workshop and the main conference is described as "Tuesday/Wednesday/Thursday", infer the full date range.
+- If only partial information exists (just a year or month), still extract what you can rather than returning null.
+- Convert any date format to YYYY-MM-DD.
+- Set to null only if there is genuinely NO date information across all three sections.
 
 Return ONLY the JSON object with all three sections. No explanation, no markdown backticks.
 
@@ -301,7 +361,7 @@ Parameters:
   timeout: 30000
   solve_cloudflare: true
   headless: true
-  main_content_only: true
+  main_content_only: false
 
 Sub-page URLs:
 {state.output_keys.SUB_PAGES_URLS}
