@@ -400,7 +400,9 @@ class PipelineRunner:
                                 existing_names.add(ks.name.strip().lower())
 
                         speakers = sub_speakers
-                        total = len(speakers)
+                        # Use the higher of merged count vs raw sources — the homepage
+                        # often advertises more speakers than we could extract names for.
+                        total = max(len(speakers), len(speakers_data.speakers) + len(homepage.keynote_speakers))
                         non_local = sum(1 for s in speakers if s.is_local is False)
                         non_usa = sum(1 for s in speakers if s.country is None or s.country != "USA")
 
