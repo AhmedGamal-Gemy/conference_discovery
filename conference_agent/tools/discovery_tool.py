@@ -5,6 +5,7 @@ from conference_agent.config import settings
 from conference_agent.tools.query_generator import generate_queries
 from conference_agent.tools.exa_tool import search_conferences
 from conference_agent.tools.relevance_filter import is_relevant_conference
+from conference_agent.tools.directory_scraper import run_directory_discovery
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,15 @@ def run_discovery(topic: str = "", months_ahead: int = 0, num_results: int = 0):
         except Exception as exc:
             logger.warning("DISCOVERY  Query %r failed: %s — continuing", query, exc)
             continue  # Don't let one bad query kill the whole run
+
+    # Run directory-discovery (aggregator scraping) if enabled
+    if settings.directories.enabled:
+        try:
+            dir_results = run_directory_discovery(topic)
+            logger.info("DISCOVERY  Directory discovery — %d results", len(dir_results))
+            raw_results.extend(dir_results)
+        except Exception as exc:
+            logger.warning("DISCOVERY  Directory discovery failed: %s — continuing", exc)
 
     # Deduplicate by URL
     dedup = {}
