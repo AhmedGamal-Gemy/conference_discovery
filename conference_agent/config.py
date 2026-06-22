@@ -67,6 +67,23 @@ class LLMModelConfig(BaseModel):
     temperature: float = 0.1
 
 
+class AggregatorConfig(BaseModel):
+    name: str
+    url: str
+    listing_selector: str = ""
+    title_selector: str = ""
+    detail_link_selector: str = ""
+    detail_url_pattern: str = ""
+    visit_link_selector: str = ""
+    extract_by_markdown: bool = False
+
+
+class DirectoriesConfig(BaseModel):
+    enabled: bool = False
+    max_entries_per_source: int = 10
+    aggregators: list[AggregatorConfig] = []
+
+
 class LLMConfig(BaseModel):
     orchestrator: LLMModelConfig = LLMModelConfig(temperature=0.2)
     discovery: LLMModelConfig = LLMModelConfig(temperature=0.2)
@@ -78,6 +95,7 @@ class SystemSettings(BaseSettings):
 
     discovery: DiscoveryConfig
     exa: ExaConfig
+    directories: DirectoriesConfig
     validation: ValidationConfig
     output: OutputConfig
     llm: LLMConfig

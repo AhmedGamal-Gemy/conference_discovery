@@ -53,3 +53,25 @@ llm:
 scrapling_mcp_url: "http://localhost:8017/mcp"
 
 debug : false
+
+# ─── Directory aggregator sources ────────────────────────────
+directories:
+  enabled: false
+  max_entries_per_source: 10
+  aggregators:
+    - name: "allconferencealert"
+      url: "https://www.allconferencealert.com/medical"
+      listing_selector: "li.event-card"
+      title_selector: "div.text-lg.font-semibold"
+      detail_link_selector: "a[href*='/event/']"
+      detail_url_pattern: ""  # auto-joined via urljoin
+      visit_link_selector: "a.bg-green-600[target='_blank']"
+      extract_by_markdown: false
+    - name: "worldconferencecalendar"
+      url: "https://worldconferencecalendar.com/events?categories=health-and-medicine"
+      listing_selector: ""
+      title_selector: ""
+      detail_link_selector: ""
+      detail_url_pattern: ""
+      visit_link_selector: ""
+      extract_by_markdown: true
