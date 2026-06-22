@@ -159,18 +159,12 @@ def validate_conference(
         ).model_dump()
 
     # Condition 1 — speakers confirmed for this edition
-    # If sub-pages say speakers_confirmed=False, check homepage keynote_speakers
-    # as fallback — single-page conferences may list speakers directly on homepage.
+    # Pass only if speakers_confirmed=True or actual named speakers from sub-pages.
+    # Keynote speakers from homepage do NOT satisfy this requirement.
     logger.debug("VALIDATE  Rule #1: speakers confirmed check")
-    if not speakers.speakers_confirmed and len(homepage.keynote_speakers) == 0:
+    if not speakers.speakers_confirmed and len(speakers.speakers) == 0:
         return reject(1, "Speakers not confirmed for this edition")
-    if not speakers.speakers_confirmed:
-        logger.info(
-            "VALIDATE  ✓ Rule #1 passed via homepage keynote_speakers fallback (%d keynote speakers)",
-            len(homepage.keynote_speakers),
-        )
-    else:
-        logger.info("VALIDATE  ✓ Rule #1 passed (sub-page speakers confirmed)")
+    logger.info("VALIDATE  ✓ Rule #1 passed")
 
     # Condition 2 — at least one speaker found
     # Consider both sub-page speakers and homepage keynote_speakers.

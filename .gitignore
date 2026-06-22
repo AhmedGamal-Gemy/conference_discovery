@@ -23,3 +23,6 @@ output/intermediate/
 .opencode/
 .playwright-mcp/
 .sisyphus/
+
+# Generated logs
+logs/
