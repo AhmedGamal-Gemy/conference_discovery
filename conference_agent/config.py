@@ -49,6 +49,12 @@ class DateWindow(BaseModel):
     max_days: int = 90
 
 
+class LogConfig(BaseModel):
+    file: str = "logs/pipeline.log"
+    max_bytes: int = 10_485_760  # 10 MB
+    backup_count: int = 3
+
+
 class ValidationConfig(BaseModel):
     min_speakers: int = 5
     min_non_local: Optional[int] = None
@@ -81,6 +87,7 @@ class SystemSettings(BaseSettings):
     validation: ValidationConfig
     output: OutputConfig
     llm: LLMConfig
+    logging: LogConfig
     scrapling_mcp_url:str
     debug: bool
 
