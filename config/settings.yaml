@@ -52,4 +52,9 @@ llm:
 
 scrapling_mcp_url: "http://localhost:8017/mcp"
 
+logging:
+  file: "logs/pipeline.log"
+  max_bytes: 10485760       # 10 MB per file
+  backup_count: 3           # keep 3 rotated logs
+
 debug : false
