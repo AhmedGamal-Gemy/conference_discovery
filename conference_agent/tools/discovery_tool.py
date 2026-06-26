@@ -42,17 +42,24 @@ def run_discovery(topic: str = "", months_ahead: int = 0, num_results: int = 0):
     queries = generate_queries(topic)
     raw_results = []
 
-    for query in queries:
-        try:
-            results = search_conferences(query, num_results)
-            logger.info("DISCOVERY  Query %r — %d results", query, len(results))
-            raw_results.extend(results)
-        except Exception as exc:
-            logger.warning("DISCOVERY  Query %r failed: %s — continuing", query, exc)
-            continue  # Don't let one bad query kill the whole run
+    # ponytail: GATE CHECK — settings is the singleton from conference_agent.config;
+    # the only callers of search_conferences() are right below, so a False here is the
+    # only thing standing between a disabled Exa and an unexpected bill.
+    logger.warning("GATE CHECK: exa=%s", settings.discovery.sources.exa)
+    if settings.discovery.sources.exa:
+        for query in queries:
+            try:
+                results = search_conferences(query, num_results)
+                logger.info("DISCOVERY  Query %r — %d results", query, len(results))
+                raw_results.extend(results)
+            except Exception as exc:
+                logger.warning("DISCOVERY  Query %r failed: %s — continuing", query, exc)
+                continue  # Don't let one bad query kill the whole run
+    else:
+        logger.info("DISCOVERY  Exa source disabled — skipping Exa queries")
 
     # Run directory-discovery (aggregator scraping) if enabled
-    if settings.directories.enabled:
+    if settings.discovery.sources.directories and settings.directories.enabled:
         try:
             dir_results = run_directory_discovery(topic)
             logger.info("DISCOVERY  Directory discovery — %d results", len(dir_results))

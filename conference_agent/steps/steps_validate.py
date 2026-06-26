@@ -172,17 +172,20 @@ def validate_conference(
     else:
         logger.info("VALIDATE  ✓ Rule #1 passed (sub-page speakers confirmed)")
 
+    # Deduplicate keynote speakers against sub-page speakers (same logic as pipeline_runner.py)
+    existing_names = {s.name.strip().lower() for s in speakers.speakers if s.name}
+    unique_keynotes = [ks for ks in homepage.keynote_speakers
+                       if ks.name and ks.name.strip().lower() not in existing_names]
+
     # Condition 2 — at least one speaker found
-    # Consider both sub-page speakers and homepage keynote_speakers.
-    total_speakers = len(speakers.speakers) + len(homepage.keynote_speakers)
-    logger.debug("VALIDATE  Rule #2: at least one speaker (sub=%d, keynote=%d)", len(speakers.speakers), len(homepage.keynote_speakers))
+    total_speakers = len(speakers.speakers) + len(unique_keynotes)
+    logger.debug("VALIDATE  Rule #2: at least one speaker (sub=%d, unique_keynote=%d)", len(speakers.speakers), len(unique_keynotes))
     if total_speakers == 0:
         return reject(2, "No speakers found")
     logger.info("VALIDATE  ✓ Rule #2 passed (%d total speakers)", total_speakers)
 
     # Condition 3 — at least 5 scientific speakers
-    # Count scientific speakers from both sub-pages and homepage keynote_speakers.
-    scientific_count = sum(1 for s in speakers.speakers if s.is_scientific) + sum(1 for ks in homepage.keynote_speakers if ks.is_scientific)
+    scientific_count = sum(1 for s in speakers.speakers if s.is_scientific) + sum(1 for ks in unique_keynotes if ks.is_scientific)
     logger.debug("VALIDATE  Rule #3: %d/%d scientific speakers", scientific_count, total_speakers)
     if scientific_count < settings.validation.min_speakers:
         return reject(3, f"Not enough scientific speakers ({scientific_count}/{settings.validation.min_speakers})")
@@ -242,7 +245,7 @@ def validate_conference(
     logger.debug("VALIDATE  Rule #10: non-USA speakers (min_non_usa=%s)", min_non_usa)
     if min_non_usa is not None:
         sp_non_usa = sum(1 for s in speakers.speakers if not _is_usa_country(s.country))
-        ks_non_usa = sum(1 for ks in homepage.keynote_speakers if not _is_usa_country(ks.country))
+        ks_non_usa = sum(1 for ks in unique_keynotes if not _is_usa_country(ks.country))
         non_usa_count = sp_non_usa + ks_non_usa
         logger.debug(
             "VALIDATE  Rule #10: non-USA count=%d (sub=%d, keynote=%d), threshold=%d",
@@ -258,6 +261,7 @@ def validate_conference(
     min_non_local = settings.validation.min_non_local
     logger.debug("VALIDATE  Rule #11: non-local speakers (min_non_local=%s)", min_non_local)
     if min_non_local is not None:
+        # KeynoteSpeaker has no is_local field; only sub-page speakers count here
         non_local_count = sum(1 for s in speakers.speakers if s.is_local is False)
         logger.debug(
             "VALIDATE  Rule #11: non-local count=%d, threshold=%d",

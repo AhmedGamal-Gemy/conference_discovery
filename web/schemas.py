@@ -129,8 +129,10 @@ class SettingsResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    topics: dict
     discovery: dict
     exa: dict
+    directories: dict
     validation: dict
     output: dict
     llm: dict
@@ -149,8 +151,10 @@ class SettingsUpdateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    topics: Optional[dict] = None
     discovery: Optional[dict] = None
     exa: Optional[dict] = None
+    directories: Optional[dict] = None
     validation: Optional[dict] = None
     output: Optional[dict] = None
     llm: Optional[dict] = None

@@ -48,6 +48,7 @@ export interface LlmSettings {
 }
 
 export interface Settings {
+  topics: Record<string, string>;
   discovery: DiscoverySettings;
   exa: ExaSettings;
   validation: ValidationSettings;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePipeline } from '../hooks/usePipeline';
 import { useDiscovery } from '../hooks/useDiscovery';
+import { useSettings } from '../hooks/useSettings';
 import { usePipelineBatch, type BatchConference } from '../hooks/usePipelineBatch';
 import PipelineStepper from '../components/PipelineStepper';
 import ConferenceCard, { ValidationResults } from '../components/ConferenceCard';
@@ -460,6 +461,7 @@ export default function HomePage() {
   const [numResults, setNumResults] = useState(5);
   const { results, isRunning: isDiscoveryRunning, isSearching, foundCount, error: discoveryError, elapsed, startDiscovery, clearResults } = useDiscovery();
   const { conferences, isRunning: isBatchRunning, totalElapsed, startBatch, cancelBatch, clearResults: clearBatch } = usePipelineBatch();
+  const { settings } = useSettings();
 
   // ── UI state ──
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
@@ -558,7 +560,20 @@ export default function HomePage() {
         <div className="discovery-form space-y-3">
           <div>
             <label className="block text-sm font-medium mb-1">Topic</label>
-            <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. medical, engineering, AI" disabled={isAnyRunning} data-testid="discovery-topic-input" className="url-input w-full" />
+            <select
+              value={Object.keys(settings?.topics || {}).includes(topic) ? topic : ''}
+              onChange={(e) => setTopic(e.target.value)}
+              disabled={isAnyRunning}
+              data-testid="discovery-topic-input"
+              className="url-input w-full"
+            >
+              <option value="" disabled>
+                {Object.keys(settings?.topics || {}).length === 0 ? 'Loading topics...' : 'Select a topic'}
+              </option>
+              {Object.entries(settings?.topics || {}).map(([slug, label]) => (
+                <option key={slug} value={slug}>{label}</option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-4">
             <div className="flex-1">

@@ -69,13 +69,18 @@ class LLMModelConfig(BaseModel):
 
 class AggregatorConfig(BaseModel):
     name: str
-    url: str
+    url_map: dict[str, str]   # topic_slug -> URL. Use key "default" as fallback.
     listing_selector: str = ""
     title_selector: str = ""
     detail_link_selector: str = ""
     detail_url_pattern: str = ""
     visit_link_selector: str = ""
     extract_by_markdown: bool = False
+
+    def url_for(self, topic: str) -> str | None:
+        """Return URL for the given topic (lowercased), with 'default' fallback. None if no match."""
+        slug = (topic or "").lower().strip()
+        return self.url_map.get(slug) or self.url_map.get("default")
 
 
 class DirectoriesConfig(BaseModel):
@@ -93,6 +98,7 @@ class LLMConfig(BaseModel):
 
 class SystemSettings(BaseSettings):
 
+    topics: dict[str, str]
     discovery: DiscoveryConfig
     exa: ExaConfig
     directories: DirectoriesConfig
@@ -101,6 +107,9 @@ class SystemSettings(BaseSettings):
     llm: LLMConfig
     scrapling_mcp_url:str
     debug: bool
+
+    def is_valid_topic(self, slug: str) -> bool:
+        return slug in self.topics
 
     # Point to your YAML file here
     model_config = SettingsConfigDict(yaml_file= str(_ROOT / "config" / "settings.yaml"))

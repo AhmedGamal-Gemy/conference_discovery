@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from web.api import router as api_router
 from web.api.pipeline import router as pipeline_router
 from web.api.discovery import router as discovery_router
+from web.api.settings import router as settings_router
 
 from conference_agent.config import settings
 
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api")
     app.include_router(pipeline_router)
     app.include_router(discovery_router, prefix="/api/discovery")
+    app.include_router(settings_router, prefix="/api")
 
     @app.get("/health")
     def health():

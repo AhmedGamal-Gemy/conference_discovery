@@ -22,8 +22,6 @@ from conference_agent.tools.scrapling_tool import scrapling_toolset
 
 logger = logging.getLogger(__name__)
 
-_MAX_CONCURRENT = 3
-
 # ── Strategy A: CSS-selector-based HTML parsing ─────────────────────────
 
 
@@ -45,7 +43,7 @@ async def _fetch_html(session, url: str, timeout: int = 30000) -> str | None:
         return None
 
 
-def _extract_listing(html: str, config) -> list[dict]:
+def _extract_listing(html: str, config, url: str) -> list[dict]:
     """Parse listing-page HTML via CSS selectors → [(title, detail_url), …]."""
     soup = BeautifulSoup(html, "html.parser")
     entries = []
@@ -64,7 +62,7 @@ def _extract_listing(html: str, config) -> list[dict]:
                 continue
 
             href = link_el["href"]
-            detail_url = config.detail_url_pattern.replace("{path}", href) if config.detail_url_pattern else urljoin(config.url, href)
+            detail_url = config.detail_url_pattern.replace("{path}", href) if config.detail_url_pattern else urljoin(url, href)
 
             entries.append({"title": title, "detail_url": detail_url})
         except Exception as exc:
@@ -73,46 +71,62 @@ def _extract_listing(html: str, config) -> list[dict]:
     return entries
 
 
-async def _fetch_visit_url(session, detail_url: str, selector: str) -> str | None:
-    """Fetch detail-page HTML and extract the actual conference website URL."""
-    html = await _fetch_html(session, detail_url, timeout=15000)
-    if not html:
-        return None
+async def _strategy_a(session, config, topic) -> list[dict]:
+    """Extract conference URLs via CSS selectors (Strategy A).
 
-    soup = BeautifulSoup(html, "html.parser")
-    link = soup.select_one(selector) if selector else None
-    return link["href"] if link and link.get("href") else None
-
-
-async def _strategy_a(session, config) -> list[dict]:
-    """Extract conference URLs via CSS selectors (Strategy A)."""
-    html = await _fetch_html(session, config.url)
+    1. Fetch listing page → extract entries
+    2. Bulk-fetch all detail pages using ``css_selector`` to extract visit links directly
+    """
+    url = config.url_for(topic)
+    if url is None:
+        logger.info("DIRECTORY  %s — no URL for topic %r, skipping", config.name, topic)
+        return []
+    html = await _fetch_html(session, url)
     if not html:
         return []
 
-    entries = _extract_listing(html, config)
+    entries = _extract_listing(html, config, url)
     logger.info("DIRECTORY  %s — %d entries from listing", config.name, len(entries))
     if not entries:
         return []
 
     if not config.visit_link_selector:
-        # No way to find the real conference URL — return detail-page URLs as-is
         return [{"url": e["detail_url"], "title": e["title"], "snippet": ""} for e in entries]
 
-    sem = asyncio.Semaphore(_MAX_CONCURRENT)
+    detail_urls = [e["detail_url"] for e in entries]
 
-    async def _resolve(entry: dict) -> dict | None:
-        async with sem:
-            visit_url = await _fetch_visit_url(session, entry["detail_url"], config.visit_link_selector)
-            if visit_url:
-                return {"url": visit_url, "title": entry["title"], "snippet": ""}
-            # ponytail: fallback to detail URL if selector fails
-            return {"url": entry["detail_url"], "title": entry["title"], "snippet": ""}
+    try:
+        r = await session.call_tool("bulk_stealthy_fetch", arguments={
+            "urls": detail_urls,
+            "timeout": 20000,
+            "extraction_type": "html",
+            "css_selector": config.visit_link_selector,
+            "solve_cloudflare": False,
+            "main_content_only": False,
+            "headless": True,
+        })
+    except Exception as exc:
+        logger.warning("DIRECTORY  %s — bulk fetch failed: %s — falling back to detail URLs", config.name, exc)
+        return [{"url": e["detail_url"], "title": e["title"], "snippet": ""} for e in entries]
 
-    tasks = [_resolve(e) for e in entries]
-    gathered = await asyncio.gather(*tasks, return_exceptions=True)
+    results = []
+    for i, tc in enumerate(r.content):
+        if i >= len(entries):
+            break
+        try:
+            raw = json.loads(tc.text)
+            htmls = raw.get("content", [])
+            snippet = htmls[0] if htmls else ""
+            if snippet:
+                soup = BeautifulSoup(snippet, "html.parser")
+                link = soup.select_one("a")
+                if link and link.get("href"):
+                    results.append({"url": link["href"], "title": entries[i]["title"], "snippet": ""})
+                    continue
+            results.append({"url": entries[i]["detail_url"], "title": entries[i]["title"], "snippet": ""})
+        except Exception:
+            results.append({"url": entries[i]["detail_url"], "title": entries[i]["title"], "snippet": ""})
 
-    results = [r for r in gathered if isinstance(r, dict)]
     logger.info("DIRECTORY  %s — %d resolved URLs", config.name, len(results))
     return results
 
@@ -127,7 +141,7 @@ async def _fetch_markdown(session, url: str) -> str | None:
             "url": url,
             "timeout": 30000,
             "extraction_type": "markdown",
-            "solve_cloudflare": False,
+            "solve_cloudflare": True,
             "main_content_only": False,
         })
         raw = json.loads(result.content[0].text)
@@ -144,7 +158,7 @@ For each entry find the official conference website URL if present,
 otherwise use the entry's detail/page URL.
 
 Return ONLY valid JSON array:
-[{"url": "...", "title": "...", "date": "..."}]
+[{{"url": "...", "title": "...", "date": "..."}}]
 
 If no conferences found return [].
 
@@ -167,22 +181,32 @@ async def _extract_via_llm(markdown: str) -> list[dict]:
         )
         content = response.choices[0].message.content
         parsed = json.loads(content)
+        logger.debug("DIRECTORY  LLM raw response: %s", content[:500])
         if isinstance(parsed, list):
             return parsed
         if isinstance(parsed, dict):
-            for key in ("conferences", "results", "entries"):
+            # Check named keys first, then fall back to any list value
+            for key in ("conferences", "results", "entries", "events", "items", "data"):
                 val = parsed.get(key)
                 if isinstance(val, list):
                     return val
+            for val in parsed.values():
+                if isinstance(val, list):
+                    return val
+            logger.warning("DIRECTORY  LLM returned dict with no list value — keys: %s", list(parsed.keys()))
         return []
     except Exception as exc:
         logger.warning("DIRECTORY  LLM extraction failed: %s", exc)
         return []
 
 
-async def _strategy_b(session, config) -> list[dict]:
+async def _strategy_b(session, config, topic) -> list[dict]:
     """Extract conference URLs via markdown + LLM (Strategy B)."""
-    markdown = await _fetch_markdown(session, config.url)
+    url = config.url_for(topic)
+    if url is None:
+        logger.info("DIRECTORY  %s — no URL for topic %r, skipping", config.name, topic)
+        return []
+    markdown = await _fetch_markdown(session, url)
     if not markdown:
         return []
 
@@ -196,13 +220,17 @@ async def _strategy_b(session, config) -> list[dict]:
 # ── Per-aggregator dispatch ────────────────────────────────────────────
 
 
-async def _scrape_aggregator(session, config) -> list[dict]:
+async def _scrape_aggregator(session, config, topic) -> list[dict]:
     """Scrape a single aggregator by dispatching to strategy A or B."""
-    logger.info("DIRECTORY  Scraping %s — %s", config.name, config.url)
+    url = config.url_for(topic)
+    if url is None:
+        logger.info("DIRECTORY  %s — no URL for topic %r, skipping", config.name, topic)
+        return []
+    logger.info("DIRECTORY  Scraping %s — %s", config.name, url)
     try:
         if config.extract_by_markdown or not config.listing_selector:
-            return await _strategy_b(session, config)
-        return await _strategy_a(session, config)
+            return await _strategy_b(session, config, topic)
+        return await _strategy_a(session, config, topic)
     except Exception as exc:
         logger.warning("DIRECTORY  Aggregator %s failed: %s", config.name, exc)
         return []
@@ -211,7 +239,7 @@ async def _scrape_aggregator(session, config) -> list[dict]:
 # ── Entry points ───────────────────────────────────────────────────────
 
 
-async def _run_all() -> list[dict]:
+async def _run_all(topic: str) -> list[dict]:
     """Scrape every configured aggregator — one shared MCP session."""
     if not settings.directories.enabled:
         return []
@@ -223,7 +251,7 @@ async def _run_all() -> list[dict]:
         session = await scrapling_toolset._mcp_session_manager.create_session()
         results: list[dict] = []
         for agg in settings.directories.aggregators:
-            agg_results = await _scrape_aggregator(session, agg)
+            agg_results = await _scrape_aggregator(session, agg, topic)
             results.extend(agg_results)
         return results
     except Exception as exc:
@@ -256,7 +284,7 @@ def run_directory_discovery(topic: str = "") -> list[dict]:
     )
 
     try:
-        results = asyncio.run(_run_all())
+        results = asyncio.run(_run_all(topic))
         elapsed = time.time() - t0
         logger.info("DIRECTORY  Complete — %d result(s) in %.1fs", len(results), elapsed)
         return results

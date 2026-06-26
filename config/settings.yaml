@@ -2,6 +2,23 @@
 # Conference Discovery — settings.yaml
 # ─────────────────────────────────────────
 
+topics:
+  medical: "Medical"
+  scientific: "Scientific"
+  cardiology: "Cardiology"
+  oncology: "Oncology"
+  radiology: "Radiology"
+  business: "Business & Economics"
+  computer-science: "Computer Science"
+  education: "Education"
+  engineering: "Engineering & Technology"
+  interdisciplinary: "Interdisciplinary"
+  law: "Law"
+  mathematics: "Mathematics & Statistics"
+  regional: "Regional Studies"
+  social-sciences: "Social Sciences & Humanities"
+  sports: "Sports Science"
+
 discovery:
   topic: "medical"
   months_ahead: 3
@@ -9,7 +26,7 @@ discovery:
   subfields: ["cardiology", "radiology", "oncology", "neurology", "pediatrics"]  # Topic sub-categories for subfield queries
   sources:
     exa: true
-    directories: false      # disabled for demo
+    directories: true
     org_websites: false     # disabled for demo
 
 exa:
@@ -56,19 +73,26 @@ debug : false
 
 # ─── Directory aggregator sources ────────────────────────────
 directories:
-  enabled: false
+  enabled: true
   max_entries_per_source: 10
   aggregators:
-    - name: "allconferencealert"
-      url: "https://www.allconferencealert.com/medical"
-      listing_selector: "li.event-card"
-      title_selector: "div.text-lg.font-semibold"
-      detail_link_selector: "a[href*='/event/']"
-      detail_url_pattern: ""  # auto-joined via urljoin
-      visit_link_selector: "a.bg-green-600[target='_blank']"
-      extract_by_markdown: false
     - name: "worldconferencecalendar"
-      url: "https://worldconferencecalendar.com/events?categories=health-and-medicine"
+      url_map:
+        medical: "https://worldconferencecalendar.com/events?categories=health-and-medicine"
+        cardiology: "https://worldconferencecalendar.com/events?categories=health-and-medicine"
+        oncology: "https://worldconferencecalendar.com/events?categories=health-and-medicine"
+        radiology: "https://worldconferencecalendar.com/events?categories=health-and-medicine"
+        scientific: "https://worldconferencecalendar.com/events?categories=physical-and-life-sciences"
+        business: "https://worldconferencecalendar.com/events?categories=business-and-economics"
+        computer-science: "https://worldconferencecalendar.com/events?categories=computer-science-and-internet"
+        education: "https://worldconferencecalendar.com/events?categories=education"
+        engineering: "https://worldconferencecalendar.com/events?categories=engineering-and-technology"
+        interdisciplinary: "https://worldconferencecalendar.com/events?categories=interdisciplinary"
+        law: "https://worldconferencecalendar.com/events?categories=law"
+        mathematics: "https://worldconferencecalendar.com/events?categories=mathematics-and-statistics"
+        regional: "https://worldconferencecalendar.com/events?categories=regional-studies"
+        social-sciences: "https://worldconferencecalendar.com/events?categories=social-sciences-and-humanities"
+        sports: "https://worldconferencecalendar.com/events?categories=sports-science"
       listing_selector: ""
       title_selector: ""
       detail_link_selector: ""

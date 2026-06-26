@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Plus, X } from 'lucide-react';
 
 // ── Props ──────────────────────────────────────────────────────────
 
@@ -99,6 +99,52 @@ export default function SettingsEditor({ settings, onSave, isSaving }: SettingsE
     });
   }, []);
 
+  const [topicRows, setTopicRows] = useState<
+    Array<{ id: string; slug: string; displayName: string }>
+  >(
+    () =>
+      Object.entries(settings.topics).map(([slug, displayName], i) => ({
+        id: `tr-${i}`,
+        slug,
+        displayName,
+      })),
+  );
+
+  const updateTopicRow = useCallback(
+    (rowId: string, field: 'slug' | 'displayName', value: string) => {
+      setTopicRows((prev) => {
+        const next = prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r));
+        const record: Record<string, string> = {};
+        for (const r of next) {
+          if (r.slug) record[r.slug] = r.displayName;
+        }
+        handleFieldChange('topics', record);
+        return next;
+      });
+    },
+    [handleFieldChange],
+  );
+
+  const removeTopicRow = useCallback(
+    (rowId: string) => {
+      setTopicRows((prev) => {
+        const next = prev.filter((r) => r.id !== rowId);
+        const record: Record<string, string> = {};
+        for (const r of next) {
+          if (r.slug) record[r.slug] = r.displayName;
+        }
+        handleFieldChange('topics', record);
+        return next;
+      });
+    },
+    [handleFieldChange],
+  );
+
+  const addTopicRow = useCallback(() => {
+    const id = `tr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setTopicRows((prev) => [...prev, { id, slug: '', displayName: '' }]);
+  }, []);
+
   const handleSave = useCallback(() => {
     const changed = computeDiff(settings, form);
     if (Object.keys(changed).length > 0) {
@@ -162,9 +208,27 @@ export default function SettingsEditor({ settings, onSave, isSaving }: SettingsE
         isExpanded={expandedSections.has('discovery')}
         onToggle={toggleSection}
       >
-        {renderInputField('Topic', 'input-discovery-topic', form.discovery.topic, (v) =>
-          handleFieldChange('discovery.topic', v),
-        )}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="input-discovery-topic">Topic</Label>
+          <select
+            id="input-discovery-topic"
+            data-testid="input-discovery-topic"
+            value={form.discovery.topic}
+            onChange={(e) => handleFieldChange('discovery.topic', e.target.value)}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {!settings.topics[form.discovery.topic] && (
+              <option value={form.discovery.topic} disabled>
+                Custom: {form.discovery.topic}
+              </option>
+            )}
+            {Object.entries(settings.topics).map(([slug, label]) => (
+              <option key={slug} value={slug}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
         {renderSwitchField('Use Exa search', 'input-discovery-sources-exa', form.discovery.sources.exa, (v) =>
           handleFieldChange('discovery.sources.exa', v),
         )}
@@ -175,6 +239,70 @@ export default function SettingsEditor({ settings, onSave, isSaving }: SettingsE
           handleFieldChange('discovery.sources.org_websites', v),
         )}
         {renderInputField('Months ahead', 'input-discovery-months_ahead', form.discovery.months_ahead, numberOnChange((v) => handleFieldChange('discovery.months_ahead', v)), 'number')}
+      </Section>
+
+      {/* Topics */}
+      <Section
+        id="topics"
+        label="Topics"
+        isExpanded={expandedSections.has('topics')}
+        onToggle={toggleSection}
+      >
+        <div className="space-y-2">
+          {topicRows.map((row) => {
+            const allSlugs = topicRows.map((r) => r.slug);
+            const dupCount = allSlugs.filter((s) => s === row.slug).length;
+            let slugError: string | null = null;
+            if (row.slug) {
+              if (row.slug !== row.slug.toLowerCase()) slugError = 'Must be lowercase';
+              else if (!/^[a-z0-9_]+$/.test(row.slug))
+                slugError = 'Only letters, numbers, and underscores allowed';
+              else if (dupCount > 1) slugError = 'Duplicate slug';
+            }
+            return (
+              <div key={row.id} className="flex items-start gap-2">
+                <div className="flex-1">
+                  <Input
+                    value={row.slug}
+                    onChange={(e) => updateTopicRow(row.id, 'slug', e.target.value)}
+                    placeholder="slug"
+                    className="font-mono"
+                  />
+                  {slugError && (
+                    <p className="mt-0.5 text-xs text-red-500">{slugError}</p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Input
+                    value={row.displayName}
+                    onChange={(e) => updateTopicRow(row.id, 'displayName', e.target.value)}
+                    placeholder="Display name"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeTopicRow(row.id)}
+                  className="mt-0 shrink-0"
+                  aria-label={`Remove ${row.displayName || 'topic'}`}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addTopicRow}
+          disabled={topicRows.filter((r) => !r.slug && !r.displayName).length >= 3}
+          className="mt-2"
+        >
+          <Plus className="mr-1 size-4" /> Add Topic
+        </Button>
       </Section>
 
       {/* Exa */}
